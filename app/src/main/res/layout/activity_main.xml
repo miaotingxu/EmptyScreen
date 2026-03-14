@@ -35,7 +35,7 @@
         android:paddingTop="4dp"
         android:paddingEnd="8dp"
         android:paddingBottom="4dp"
-        android:textColor="#333333"
+        android:textColor="#FF0000"
         android:textSize="12sp"
         tools:text="内存: 45.2%" />
 

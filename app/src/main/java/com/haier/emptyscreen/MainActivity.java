@@ -40,6 +40,7 @@ import com.haier.emptyscreen.adapter.FileBrowserAdapter;
 import com.haier.emptyscreen.adapter.StorageDeviceAdapter;
 import com.haier.emptyscreen.model.VideoFile;
 import com.haier.emptyscreen.service.ForegroundService;
+import com.haier.emptyscreen.utils.FocusUtils;
 import com.haier.emptyscreen.utils.LogUtils;
 import com.haier.emptyscreen.utils.MemoryUtils;
 import com.haier.emptyscreen.utils.NetworkUtils;
@@ -191,8 +192,16 @@ public class MainActivity extends AppCompatActivity implements CustomWebViewClie
         
         LogUtils.i("[MainActivity] WebView configured");
     }
-
+    long totalMemory;
     private void setupMemoryMonitor() {
+         totalMemory = MemoryUtils.getTotalMemory(this);
+        long availableMemory = MemoryUtils.getAvailableMemory(this);
+        long usedMemory = totalMemory - availableMemory;
+        float usagePercent = MemoryUtils.getSystemMemoryUsagePercent(this);
+        LogUtils.i("[SettingsActivity] Memory info updated - Total: " + MemoryUtils.formatSize(totalMemory)
+                + ", Available: " + MemoryUtils.formatSize(availableMemory)
+                + ", Used: " + MemoryUtils.formatSize(usedMemory)
+                + ", Percent: " + String.format("%.1f%%", usagePercent));
         mMemoryHandler = new Handler(Looper.getMainLooper());
         mMemoryRunnable = new Runnable() {
             @Override
@@ -204,8 +213,9 @@ public class MainActivity extends AppCompatActivity implements CustomWebViewClie
     }
 
     private void updateMemoryInfo() {
+        float usagePercent = MemoryUtils.getSystemMemoryUsagePercent(this);
         String memoryPercent = MemoryUtils.getMemoryUsagePercent(this);
-        mTvMemoryInfo.setText(memoryPercent);
+        mTvMemoryInfo.setText(String.format("%.1f%%", usagePercent));
     }
 
     private void loadUrl() {
