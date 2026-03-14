@@ -1,0 +1,60 @@
+<resources>
+    <string name="app_name">EmptyScreen</string>
+    <string name="settings">设置</string>
+    <string name="system_settings">系统设置</string>
+    <string name="back">返回</string>
+    <string name="network_info">网络信息</string>
+    <string name="network_status">网络状态</string>
+    <string name="network_type">网络类型</string>
+    <string name="network_name">网络名称</string>
+    <string name="ip_address">IP地址</string>
+    <string name="web_page_settings">网页设置</string>
+    <string name="enter_url">URL地址</string>
+    <string name="url_hint">https://www.example.com</string>
+    <string name="save">保存</string>
+    <string name="time_settings">时间设置</string>
+    <string name="boot_delay_hint">开机后延迟启动应用的秒数</string>
+    <string name="foreground_delay_hint">应用退到后台后延迟拉取到前台的秒数</string>
+    <string name="seconds">秒</string>
+    <string name="save_time_settings">保存时间设置</string>
+    <string name="app_version">版本 1.0</string>
+    <string name="page_load_error">页面加载失败</string>
+    <string name="retry">重试</string>
+    <string name="memory_usage">内存占用</string>
+    <string name="memory_info">内存信息</string>
+    <string name="total_memory">总内存</string>
+    <string name="available_memory">可用内存</string>
+    <string name="used_memory">已用内存</string>
+    <string name="no_network">无网络连接</string>
+    <string name="url_saved">URL已保存</string>
+    <string name="time_settings_saved">时间设置已保存</string>
+    <string name="invalid_url">URL格式不正确</string>
+    <string name="loading">加载中...</string>
+    
+    <string name="select_storage_device">选择存储设备</string>
+    <string name="storage_devices">存储设备</string>
+    <string name="no_storage_device">未检测到存储设备</string>
+    <string name="video_source">视频来源</string>
+    <string name="local_video">本地视频</string>
+    <string name="network_video">网络视频</string>
+    <string name="enter_network_url">请输入网络视频URL</string>
+    <string name="play_network_video">播放网络视频</string>
+    
+    <string name="file_browser">文件浏览</string>
+    <string name="no_video_files">当前目录没有视频文件</string>
+    <string name="select_video">选择视频</string>
+    <string name="play_mode">播放模式</string>
+    <string name="play_mode_title">选择播放模式</string>
+    <string name="loop_single">循环播放当前视频</string>
+    <string name="loop_folder">循环播放当前文件夹</string>
+    <string name="loop_current_video">循环播放当前视频</string>
+    <string name="loop_folder_videos">循环播放文件夹内所有视频</string>
+    
+    <string name="video_play_error">视频播放失败</string>
+    <string name="scanning">正在扫描...</string>
+    <string name="loading_files">正在加载文件...</string>
+    <string name="access_denied">无法访问存储设备</string>
+    <string name="file_not_found">文件不存在</string>
+    <string name="connected">已连接</string>
+    <string name="disconnected">未连接</string>
+</resources>
