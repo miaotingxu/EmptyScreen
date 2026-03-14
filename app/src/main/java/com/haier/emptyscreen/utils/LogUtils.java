@@ -7,12 +7,27 @@ import android.util.Log;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.lang.ref.WeakReference;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * 日志工具类 - 统一日志输出和文件记录
+ * 
+ * <p>特点：</p>
+ * <ul>
+ *   <li>统一TAG: "EmptyScreen"</li>
+ *   <li>支持可变参数格式化</li>
+ *   <li>日志写入外部存储文件</li>
+ *   <li>使用WeakReference防止内存泄漏</li>
+ * </ul>
+ * 
+ * @author EmptyScreen Team
+ * @version 1.0
+ */
 public class LogUtils {
     private static final String TAG = "EmptyScreen";
     private static final int LOG_LEVEL_DEBUG = 0;
@@ -25,21 +40,35 @@ public class LogUtils {
     private static final int MAX_LOG_FILES = 5;
     private static final int LOG_RETENTION_DAYS = 7;
     
-    private static Context sContext;
+    /** 使用WeakReference包装Context，防止内存泄漏 */
+    private static WeakReference<Context> sContextRef;
     private static ExecutorService sExecutor;
     private static SimpleDateFormat sDateFormat;
     private static File sLogDir;
     
+    /**
+     * 初始化日志工具
+     * 
+     * <p>使用ApplicationContext避免内存泄漏</p>
+     * 
+     * @param context 应用上下文（建议使用ApplicationContext）
+     */
     public static void init(Context context) {
-        sContext = context.getApplicationContext();
+        if (context == null) {
+            Log.e(TAG, "[LogUtils] init failed: context is null");
+            return;
+        }
+        
+        Context appContext = context.getApplicationContext();
+        sContextRef = new WeakReference<>(appContext);
         sExecutor = Executors.newSingleThreadExecutor();
         sDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault());
         
-        File externalDir = sContext.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS);
+        File externalDir = appContext.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS);
         if (externalDir != null) {
             sLogDir = new File(externalDir, "logs");
         } else {
-            sLogDir = new File(sContext.getFilesDir(), "logs");
+            sLogDir = new File(appContext.getFilesDir(), "logs");
         }
         if (!sLogDir.exists()) {
             sLogDir.mkdirs();
@@ -48,6 +77,29 @@ public class LogUtils {
         cleanOldLogs();
         
         i("[LogUtils] LogUtils initialized");
+    }
+    
+    /**
+     * 获取Context
+     * 
+     * @return ApplicationContext，可能为null
+     */
+    private static Context getContext() {
+        if (sContextRef != null) {
+            return sContextRef.get();
+        }
+        return null;
+    }
+    
+    /**
+     * 获取ApplicationContext
+     * 
+     * <p>供外部工具类使用，返回ApplicationContext避免内存泄漏</p>
+     * 
+     * @return ApplicationContext，可能为null
+     */
+    public static Context getApplicationContext() {
+        return getContext();
     }
     
     public static void d(String message) {

@@ -2,6 +2,8 @@ package com.haier.emptyscreen;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -13,13 +15,16 @@ import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ProgressBar;
 import android.widget.ScrollView;
+import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SwitchCompat;
 
 import com.haier.emptyscreen.utils.FocusUtils;
 import com.haier.emptyscreen.utils.LogUtils;
+import com.haier.emptyscreen.utils.MemoryCleaner;
 import com.haier.emptyscreen.utils.MemoryUtils;
 import com.haier.emptyscreen.utils.NetworkUtils;
 import com.haier.emptyscreen.utils.OrientationHelper;
@@ -30,6 +35,15 @@ public class SettingsActivity extends AppCompatActivity {
 
     private static final int MIN_DELAY = 30;
     private static final int MAX_DELAY = 500;
+    private static final int MIN_THRESHOLD = 50;
+    private static final int MAX_THRESHOLD = 95;
+    private static final int MIN_INTERVAL = 30;
+    private static final int MAX_INTERVAL = 300;
+    
+    private TextView mTvThresholdValue;
+    private SeekBar mSeekbarThreshold;
+    private Button mBtnCleanNow;
+    private TextView mTvCleanLog;
 
     private ScrollView mScrollView;
     private TextView mTvNetworkStatus;
@@ -49,9 +63,12 @@ public class SettingsActivity extends AppCompatActivity {
     private Button mBtnSaveTimeSettings;
     private ImageButton mBtnBack;
     private ImageButton mBtnSystemSettings;
+    
+    private SwitchCompat mSwitchMemoryCleanEnabled;
+    private EditText mEtCleanInterval;
 
     private PrefsManager mPrefsManager;
-    private int mCurrentOrientation;
+    private Handler mHandler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -59,8 +76,7 @@ public class SettingsActivity extends AppCompatActivity {
         LogUtils.i("[SettingsActivity] onCreate");
         
         mPrefsManager = PrefsManager.getInstance(this);
-        mCurrentOrientation = OrientationHelper.getCurrentOrientation(this);
-        
+
         setContentView(R.layout.activity_settings);
         
         initViews();
@@ -108,6 +124,34 @@ public class SettingsActivity extends AppCompatActivity {
             }
         });
         
+        mSwitchMemoryCleanEnabled.setOnFocusChangeListener((v, hasFocus) -> {
+            FocusUtils.applyFocusAnimation(v, hasFocus);
+            if (hasFocus) {
+                FocusUtils.scrollToFocusedView(mScrollView, v);
+            }
+        });
+        
+        mSeekbarThreshold.setOnFocusChangeListener((v, hasFocus) -> {
+            FocusUtils.applyFocusAnimation(v, hasFocus);
+            if (hasFocus) {
+                FocusUtils.scrollToFocusedView(mScrollView, v);
+            }
+        });
+        
+        mEtCleanInterval.setOnFocusChangeListener((v, hasFocus) -> {
+            FocusUtils.applyFocusAnimation(v, hasFocus);
+            if (hasFocus) {
+                FocusUtils.scrollToFocusedView(mScrollView, v);
+            }
+        });
+        
+        mBtnCleanNow.setOnFocusChangeListener((v, hasFocus) -> {
+            FocusUtils.applyFocusAnimation(v, hasFocus);
+            if (hasFocus) {
+                FocusUtils.scrollToFocusedView(mScrollView, v);
+            }
+        });
+        
         mBtnBack.requestFocus();
     }
 
@@ -130,6 +174,15 @@ public class SettingsActivity extends AppCompatActivity {
         mBtnSaveTimeSettings = findViewById(R.id.btn_save_time_settings);
         mBtnBack = findViewById(R.id.btn_back);
         mBtnSystemSettings = findViewById(R.id.btn_system_settings);
+        
+        mSwitchMemoryCleanEnabled = findViewById(R.id.switch_memory_clean_enabled);
+        mTvThresholdValue = findViewById(R.id.tv_threshold_value);
+        mSeekbarThreshold = findViewById(R.id.seekbar_threshold);
+        mEtCleanInterval = findViewById(R.id.et_clean_interval);
+        mBtnCleanNow = findViewById(R.id.btn_clean_now);
+        mTvCleanLog = findViewById(R.id.tv_clean_log);
+        
+        mHandler = new Handler(Looper.getMainLooper());
     }
 
     private void loadSettings() {
@@ -141,6 +194,18 @@ public class SettingsActivity extends AppCompatActivity {
         
         int foregroundDelay = mPrefsManager.getForegroundDelaySeconds();
         mEtForegroundDelay.setText(String.valueOf(foregroundDelay));
+        
+        boolean memoryCleanEnabled = mPrefsManager.isMemoryCleanEnabled();
+        mSwitchMemoryCleanEnabled.setChecked(memoryCleanEnabled);
+        
+        int threshold = mPrefsManager.getMemoryCleanThreshold();
+        mTvThresholdValue.setText(threshold + "%");
+        mSeekbarThreshold.setProgress(threshold - MIN_THRESHOLD);
+        
+        int interval = mPrefsManager.getMemoryCleanInterval();
+        mEtCleanInterval.setText(String.valueOf(interval));
+        
+        updateCleanLog();
         
         LogUtils.i("[SettingsActivity] Settings loaded - URL: " + url + ", BootDelay: " + bootDelay + ", ForegroundDelay: " + foregroundDelay);
     }
@@ -236,6 +301,38 @@ public class SettingsActivity extends AppCompatActivity {
         mBtnSaveTimeSettings.setOnClickListener(v -> saveTimeSettings());
 
         mBtnSystemSettings.setOnClickListener(v -> openSystemSettings());
+        
+        mSwitchMemoryCleanEnabled.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            mPrefsManager.saveMemoryCleanEnabled(isChecked);
+            LogUtils.i("[SettingsActivity] Memory clean enabled: " + isChecked);
+        });
+        
+        mSeekbarThreshold.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                int threshold = MIN_THRESHOLD + progress;
+                mTvThresholdValue.setText(threshold + "%");
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+                int threshold = MIN_THRESHOLD + seekBar.getProgress();
+                mPrefsManager.saveMemoryCleanThreshold(threshold);
+                LogUtils.i("[SettingsActivity] Memory clean threshold saved: " + threshold + "%");
+            }
+        });
+        
+        mEtCleanInterval.setOnFocusChangeListener((v, hasFocus) -> {
+            if (!hasFocus) {
+                saveCleanInterval();
+            }
+        });
+        
+        mBtnCleanNow.setOnClickListener(v -> performMemoryClean());
     }
 
     private boolean validateUrl(String url) {
@@ -334,6 +431,59 @@ public class SettingsActivity extends AppCompatActivity {
                 LogUtils.e("[SettingsActivity] Failed to open device info settings: " + e2.getMessage());
                 Toast.makeText(this, "无法打开系统设置", Toast.LENGTH_SHORT).show();
             }
+        }
+    }
+
+    private void saveCleanInterval() {
+        String intervalStr = mEtCleanInterval.getText().toString().trim();
+        int interval = MIN_INTERVAL;
+        
+        try {
+            if (!intervalStr.isEmpty()) {
+                interval = Integer.parseInt(intervalStr);
+                if (interval < MIN_INTERVAL) interval = MIN_INTERVAL;
+                if (interval > MAX_INTERVAL) interval = MAX_INTERVAL;
+            }
+        } catch (NumberFormatException e) {
+            LogUtils.e("[SettingsActivity] Invalid clean interval: " + e.getMessage());
+        }
+        
+        mPrefsManager.saveMemoryCleanInterval(interval);
+        mEtCleanInterval.setText(String.valueOf(interval));
+        LogUtils.i("[SettingsActivity] Clean interval saved: " + interval + " seconds");
+    }
+
+    private void performMemoryClean() {
+        Toast.makeText(this, R.string.memory_cleaning, Toast.LENGTH_SHORT).show();
+        
+        new Thread(() -> {
+            MemoryCleaner.CleanResult result = MemoryCleaner.cleanMemory(this);
+            
+            mHandler.post(() -> {
+                if (result.success) {
+                    String message = getString(R.string.memory_clean_result,
+                            MemoryUtils.formatSize(result.freedBytes),
+                            result.beforePercent,
+                            result.afterPercent);
+                    Toast.makeText(this, R.string.memory_clean_complete, Toast.LENGTH_SHORT).show();
+                    updateMemoryInfo();
+                    updateCleanLog();
+                    LogUtils.i("[SettingsActivity] " + message);
+                } else {
+                    Toast.makeText(this, "内存清理失败", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }).start();
+    }
+
+    private void updateCleanLog() {
+        String latestLog = MemoryCleaner.getLatestCleanLog();
+        if (latestLog != null && !latestLog.equals("No cleanup records")) {
+            mTvCleanLog.setText(getString(R.string.latest_clean_log, latestLog));
+            mTvCleanLog.setVisibility(View.VISIBLE);
+        } else {
+            mTvCleanLog.setText(R.string.no_clean_record);
+            mTvCleanLog.setVisibility(View.GONE);
         }
     }
 

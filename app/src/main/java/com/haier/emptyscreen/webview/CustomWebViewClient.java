@@ -3,7 +3,10 @@ package com.haier.emptyscreen.webview;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.net.http.SslError;
 import android.view.View;
+import android.webkit.ClientCertRequest;
+import android.webkit.SslErrorHandler;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
@@ -16,6 +19,17 @@ import android.widget.TextView;
 
 import com.haier.emptyscreen.utils.LogUtils;
 
+/**
+ * 自定义WebViewClient - 处理页面加载、错误和性能优化
+ * 
+ * <p>核心功能：</p>
+ * <ul>
+ *   <li>页面加载状态管理</li>
+ *   <li>错误处理和显示</li>
+ *   <li>性能优化注入</li>
+ *   <li>定时器监控</li>
+ * </ul>
+ */
 public class CustomWebViewClient extends WebViewClient {
     
     private final Context mContext;
@@ -27,6 +41,9 @@ public class CustomWebViewClient extends WebViewClient {
     
     private boolean mHasError = false;
     
+    /**
+     * 错误回调接口
+     */
     public interface WebViewErrorCallback {
         void onRetry();
     }
@@ -78,12 +95,17 @@ public class CustomWebViewClient extends WebViewClient {
     public void onPageFinished(WebView view, String url) {
         super.onPageFinished(view, url);
         LogUtils.i("[CustomWebViewClient] Page finished loading: " + url);
+        
         if (mProgressBar != null) {
             mProgressBar.setVisibility(View.GONE);
         }
         if (!mHasError) {
             hideError();
         }
+        
+        WebViewPerformanceManager.injectTimerMonitor(view);
+        
+        LogUtils.i("[CustomWebViewClient] Timer monitor injected for: " + url);
     }
     
     @Override
@@ -116,6 +138,46 @@ public class CustomWebViewClient extends WebViewClient {
             LogUtils.e("[CustomWebViewClient] Received HTTP error: " + statusCode + " " + reason);
             showError(errorMessage);
         }
+    }
+    
+    @Override
+    public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
+        super.onReceivedSslError(view, handler, error);
+        
+        String errorMessage = "SSL证书错误";
+        switch (error.getPrimaryError()) {
+            case SslError.SSL_NOTYETVALID:
+                errorMessage = "SSL证书尚未生效";
+                break;
+            case SslError.SSL_EXPIRED:
+                errorMessage = "SSL证书已过期";
+                break;
+            case SslError.SSL_IDMISMATCH:
+                errorMessage = "SSL证书域名不匹配";
+                break;
+            case SslError.SSL_UNTRUSTED:
+                errorMessage = "SSL证书不受信任";
+                break;
+            case SslError.SSL_DATE_INVALID:
+                errorMessage = "SSL证书日期无效";
+                break;
+            case SslError.SSL_INVALID:
+                errorMessage = "SSL证书无效";
+                break;
+        }
+        
+        LogUtils.e("[CustomWebViewClient] SSL Error: " + errorMessage + " for URL: " + view.getUrl());
+        
+        handler.cancel();
+        
+        mHasError = true;
+        showError(errorMessage);
+    }
+    
+    @Override
+    public void onReceivedClientCertRequest(WebView view, ClientCertRequest request) {
+        super.onReceivedClientCertRequest(view, request);
+        LogUtils.w("[CustomWebViewClient] Client certificate request received for: " + view.getUrl());
     }
     
     private void showError(String message) {

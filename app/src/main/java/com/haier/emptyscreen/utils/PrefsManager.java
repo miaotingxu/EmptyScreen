@@ -11,10 +11,16 @@ public class PrefsManager {
     private static final String KEY_FOREGROUND_DELAY_SECONDS = "foreground_delay_seconds";
     private static final String KEY_FIRST_LAUNCH = "first_launch";
     private static final String KEY_IS_ON_SETTINGS_PAGE = "is_on_settings_page";
+    private static final String KEY_MEMORY_CLEAN_THRESHOLD = "memory_clean_threshold";
+    private static final String KEY_MEMORY_CLEAN_ENABLED = "memory_clean_enabled";
+    private static final String KEY_MEMORY_CLEAN_INTERVAL = "memory_clean_interval";
     
     private static final String DEFAULT_URL = "https://www.baidu.com";
     private static final int DEFAULT_BOOT_DELAY = 10;
     private static final int DEFAULT_FOREGROUND_DELAY = 30;
+    private static final int DEFAULT_MEMORY_CLEAN_THRESHOLD = 80;
+    private static final boolean DEFAULT_MEMORY_CLEAN_ENABLED = true;
+    private static final int DEFAULT_MEMORY_CLEAN_INTERVAL = 60;
     
     private static PrefsManager sInstance;
     private final SharedPreferences mPrefs;
@@ -72,6 +78,33 @@ public class PrefsManager {
     
     public boolean isOnSettingsPage() {
         return mPrefs.getBoolean(KEY_IS_ON_SETTINGS_PAGE, false);
+    }
+    
+    public void saveMemoryCleanThreshold(int threshold) {
+        mPrefs.edit().putInt(KEY_MEMORY_CLEAN_THRESHOLD, threshold).apply();
+        LogUtils.i("[PrefsManager] Memory clean threshold saved: " + threshold + "%");
+    }
+    
+    public int getMemoryCleanThreshold() {
+        return mPrefs.getInt(KEY_MEMORY_CLEAN_THRESHOLD, DEFAULT_MEMORY_CLEAN_THRESHOLD);
+    }
+    
+    public void saveMemoryCleanEnabled(boolean enabled) {
+        mPrefs.edit().putBoolean(KEY_MEMORY_CLEAN_ENABLED, enabled).apply();
+        LogUtils.i("[PrefsManager] Memory clean enabled: " + enabled);
+    }
+    
+    public boolean isMemoryCleanEnabled() {
+        return mPrefs.getBoolean(KEY_MEMORY_CLEAN_ENABLED, DEFAULT_MEMORY_CLEAN_ENABLED);
+    }
+    
+    public void saveMemoryCleanInterval(int seconds) {
+        mPrefs.edit().putInt(KEY_MEMORY_CLEAN_INTERVAL, seconds).apply();
+        LogUtils.i("[PrefsManager] Memory clean interval saved: " + seconds + " seconds");
+    }
+    
+    public int getMemoryCleanInterval() {
+        return mPrefs.getInt(KEY_MEMORY_CLEAN_INTERVAL, DEFAULT_MEMORY_CLEAN_INTERVAL);
     }
     
     public void clearAll() {

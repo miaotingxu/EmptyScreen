@@ -57,4 +57,15 @@
     <string name="file_not_found">文件不存在</string>
     <string name="connected">已连接</string>
     <string name="disconnected">未连接</string>
+    
+    <string name="memory_clean_settings">内存清理设置</string>
+    <string name="auto_memory_clean">自动内存清理</string>
+    <string name="clean_threshold">清理阈值</string>
+    <string name="clean_interval">检查间隔</string>
+    <string name="clean_now">立即清理</string>
+    <string name="memory_cleaning">正在清理内存...</string>
+    <string name="memory_clean_complete">内存清理完成</string>
+    <string name="memory_clean_result">释放: %1$s, 清理前: %2$.1f%%, 清理后: %3$.1f%%</string>
+    <string name="latest_clean_log">最近清理: %1$s</string>
+    <string name="no_clean_record">暂无清理记录</string>
 </resources>

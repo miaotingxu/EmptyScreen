@@ -48,6 +48,7 @@ import com.haier.emptyscreen.utils.PrefsManager;
 import com.haier.emptyscreen.utils.StorageUtils;
 import com.haier.emptyscreen.utils.UrlValidator;
 import com.haier.emptyscreen.webview.CustomWebViewClient;
+import com.haier.emptyscreen.webview.WebViewPerformanceManager;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -154,25 +155,7 @@ public class MainActivity extends AppCompatActivity implements CustomWebViewClie
 
     @SuppressLint("SetJavaScriptEnabled")
     private void setupWebView() {
-        WebSettings settings = mWebView.getSettings();
-        
-        settings.setJavaScriptEnabled(true);
-        settings.setJavaScriptCanOpenWindowsAutomatically(true);
-        settings.setSupportZoom(true);
-        settings.setBuiltInZoomControls(true);
-        settings.setDisplayZoomControls(false);
-        settings.setUseWideViewPort(true);
-        settings.setLoadWithOverviewMode(true);
-        settings.setDomStorageEnabled(true);
-        settings.setDatabaseEnabled(true);
-        settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-        settings.setAllowFileAccess(false);
-        settings.setAllowContentAccess(false);
-        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
-        
-        CookieManager cookieManager = CookieManager.getInstance();
-        cookieManager.setAcceptCookie(true);
-        cookieManager.setAcceptThirdPartyCookies(mWebView, true);
+        WebViewPerformanceManager.configureForComplexPage(mWebView, this);
         
         mWebViewClient = new CustomWebViewClient(this, mProgressBar, mErrorLayout, 
                 mTvErrorMessage, mBtnRetry, this);
@@ -190,7 +173,7 @@ public class MainActivity extends AppCompatActivity implements CustomWebViewClie
             }
         });
         
-        LogUtils.i("[MainActivity] WebView configured");
+        LogUtils.i("[MainActivity] WebView configured with performance optimizations");
     }
     long totalMemory;
     private void setupMemoryMonitor() {
@@ -682,29 +665,58 @@ public class MainActivity extends AppCompatActivity implements CustomWebViewClie
         LogUtils.i("[MainActivity] onStop");
     }
 
+    private void releaseDialogListeners() {
+        if (mStorageDialog != null) {
+            if (mStorageDialog.isShowing()) {
+                mStorageDialog.dismiss();
+            }
+            mStorageDialog.setOnKeyListener(null);
+            mStorageDialog = null;
+        }
+        
+        if (mFileBrowserDialog != null) {
+            if (mFileBrowserDialog.isShowing()) {
+                mFileBrowserDialog.dismiss();
+            }
+            mFileBrowserDialog.setOnKeyListener(null);
+            mFileBrowserDialog = null;
+        }
+        
+        if (mStorageAdapter != null) {
+            mStorageAdapter.setOnDeviceClickListener(null);
+            mStorageAdapter = null;
+        }
+        
+        if (mFileAdapter != null) {
+            mFileAdapter.setOnItemClickListener(null);
+            mFileAdapter = null;
+        }
+        
+        mWebViewClient = null;
+    }
+
     @Override
     protected void onDestroy() {
         LogUtils.i("[MainActivity] onDestroy");
         
         if (mMemoryHandler != null) {
-            mMemoryHandler.removeCallbacks(mMemoryRunnable);
+            mMemoryHandler.removeCallbacksAndMessages(null);
+            mMemoryHandler = null;
         }
+        mMemoryRunnable = null;
         
         if (mWebView != null) {
-            mWebView.destroy();
+            WebViewPerformanceManager.injectCleanupScript(mWebView);
+            WebViewPerformanceManager.safeDestroy(mWebView);
+            mWebView = null;
         }
         
-        if (mExecutor != null) {
-            mExecutor.shutdown();
+        if (mExecutor != null && !mExecutor.isShutdown()) {
+            mExecutor.shutdownNow();
+            mExecutor = null;
         }
         
-        if (mStorageDialog != null && mStorageDialog.isShowing()) {
-            mStorageDialog.dismiss();
-        }
-        
-        if (mFileBrowserDialog != null && mFileBrowserDialog.isShowing()) {
-            mFileBrowserDialog.dismiss();
-        }
+        releaseDialogListeners();
         
         super.onDestroy();
     }
