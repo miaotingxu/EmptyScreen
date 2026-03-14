@@ -374,7 +374,7 @@ public class ForegroundService extends Service {
         
         PendingIntent pendingIntent = PendingIntent.getActivity(
                 this, 
-                FOREGROUND_NOTIFICATION_ID + 1,
+                NOTIFICATION_ID + 1,
                 intent,
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
         );
@@ -392,7 +392,7 @@ public class ForegroundService extends Service {
         NotificationManager notificationManager = 
                 (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         if (notificationManager != null) {
-            notificationManager.notify(FOREGROUND_NOTIFICATION_ID + 1, builder.build());
+            notificationManager.notify(NOTIFICATION_ID + 1, builder.build());
             LogUtils.i("[ForegroundService] Full-screen notification posted for Android 10+");
         }
         

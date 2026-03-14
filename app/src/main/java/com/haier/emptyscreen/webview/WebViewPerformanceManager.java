@@ -49,9 +49,6 @@ public class WebViewPerformanceManager {
         }
         
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-        settings.setAppCacheEnabled(true);
-        settings.setAppCachePath(context.getCacheDir().getAbsolutePath());
-        settings.setAppCacheMaxSize(50 * 1024 * 1024);
         
         settings.setRenderPriority(WebSettings.RenderPriority.HIGH);
         settings.setEnableSmoothTransition(true);
