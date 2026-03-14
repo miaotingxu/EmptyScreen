@@ -56,7 +56,7 @@ public class MemoryCleaner {
     private static List<CleanLog> sCleanLogs = new ArrayList<>();
     
     /** 最大日志数量 */
-    private static final int MAX_LOG_COUNT = 50;
+    private static final int MAX_LOG_COUNT = 20;
 
     /**
      * 清理日志数据类
@@ -173,6 +173,11 @@ public class MemoryCleaner {
         if (itemsStr.endsWith(", ")) {
             itemsStr = itemsStr.substring(0, itemsStr.length() - 2);
         }
+        
+        // 限制清理项目描述的长度，防止内存占用过高
+        if (itemsStr.length() > 200) {
+            itemsStr = itemsStr.substring(0, 200) + "...";
+        }
 
         CleanLog log = new CleanLog(timestamp, beforePercent, afterPercent, freedBytes, itemsStr);
         addCleanLog(log);
@@ -250,7 +255,14 @@ public class MemoryCleaner {
             System.runFinalization();
             System.gc();
 
-            Thread.sleep(100);
+            // 使用可中断的sleep
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                LogUtils.w(TAG + " Dalvik GC interrupted");
+                return;
+            }
 
             long afterMemory = Debug.getNativeHeapAllocatedSize();
             long freed = beforeMemory - afterMemory;
@@ -271,7 +283,14 @@ public class MemoryCleaner {
             runtime.gc();
             System.gc();
 
-            Thread.sleep(50);
+            // 使用可中断的sleep
+            try {
+                Thread.sleep(50);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                LogUtils.w(TAG + " Runtime GC interrupted");
+                return;
+            }
 
             long afterFree = runtime.freeMemory();
             long freed = afterFree - beforeFree;

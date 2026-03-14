@@ -201,10 +201,10 @@ public class LogUtils {
                 String timestamp = sDateFormat.format(new Date());
                 String logLine = String.format(Locale.getDefault(), "[%s] %s: %s\n", timestamp, levelStr, message);
                 
-                FileWriter writer = new FileWriter(logFile, true);
-                writer.append(logLine);
-                writer.flush();
-                writer.close();
+                try (FileWriter writer = new FileWriter(logFile, true)) {
+                    writer.append(logLine);
+                    writer.flush();
+                }
             } catch (IOException e) {
                 Log.e(TAG, "Failed to write log to file: " + e.getMessage());
             }

@@ -56,7 +56,8 @@ public class WebViewPerformanceManager {
         settings.setRenderPriority(WebSettings.RenderPriority.HIGH);
         settings.setEnableSmoothTransition(true);
         
-        settings.setBlockNetworkImage(false);
+        // 启用图片延迟加载，先加载页面内容
+        settings.setBlockNetworkImage(true);
         settings.setBlockNetworkLoads(false);
         settings.setLoadsImagesAutomatically(true);
         
@@ -219,21 +220,59 @@ public class WebViewPerformanceManager {
             "(function() {" +
             "   window.__timerCount = 0;" +
             "   window.__cleanupTimers = [];" +
+            "   window.__MAX_TIMERS = 1000; // 定时器数量上限" +
             "   var originalSetInterval = window.setInterval;" +
             "   var originalSetTimeout = window.setTimeout;" +
+            "   var originalClearInterval = window.clearInterval;" +
+            "   var originalClearTimeout = window.clearTimeout;" +
+            "   " +
+            "   // 清理已失效的定时器ID" +
+            "   window.__cleanupExpiredTimers = function() {" +
+            "       // 这里可以添加清理逻辑，例如移除已清除的定时器ID" +
+            "       console.log('[WebViewPerf] Expired timers cleaned');" +
+            "   };" +
+            "   " +
             "   window.setInterval = function(fn, delay) {" +
+            "       if (window.__timerCount >= window.__MAX_TIMERS) {" +
+            "           console.warn('[WebViewPerf] Max timers reached (' + window.__MAX_TIMERS + '), rejecting new timer');" +
+            "           return null;" +
+            "       }" +
             "       var id = originalSetInterval.call(window, fn, delay);" +
             "       window.__cleanupTimers.push(id);" +
             "       window.__timerCount++;" +
             "       console.log('[WebViewPerf] setInterval created, total:', window.__timerCount);" +
             "       return id;" +
             "   };" +
+            "   " +
             "   window.setTimeout = function(fn, delay) {" +
+            "       if (window.__timerCount >= window.__MAX_TIMERS) {" +
+            "           console.warn('[WebViewPerf] Max timers reached (' + window.__MAX_TIMERS + '), rejecting new timer');" +
+            "           return null;" +
+            "       }" +
             "       var id = originalSetTimeout.call(window, fn, delay);" +
             "       window.__cleanupTimers.push(id);" +
             "       return id;" +
             "   };" +
-            "   console.log('[WebViewPerf] Timer monitor injected');" +
+            "   " +
+            "   window.clearInterval = function(id) {" +
+            "       originalClearInterval.call(window, id);" +
+            "       var index = window.__cleanupTimers.indexOf(id);" +
+            "       if (index > -1) {" +
+            "           window.__cleanupTimers.splice(index, 1);" +
+            "           window.__timerCount--;" +
+            "           console.log('[WebViewPerf] setInterval cleared, total:', window.__timerCount);" +
+            "       }" +
+            "   };" +
+            "   " +
+            "   window.clearTimeout = function(id) {" +
+            "       originalClearTimeout.call(window, id);" +
+            "       var index = window.__cleanupTimers.indexOf(id);" +
+            "       if (index > -1) {" +
+            "           window.__cleanupTimers.splice(index, 1);" +
+            "       }" +
+            "   };" +
+            "   " +
+            "   console.log('[WebViewPerf] Timer monitor injected with max limit: ' + window.__MAX_TIMERS);" +
             "})();";
         
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
@@ -258,5 +297,20 @@ public class WebViewPerformanceManager {
                 "Allocated: %d KB, Free: %d KB",
                 (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()) / 1024,
                 Runtime.getRuntime().freeMemory() / 1024);
+    }
+    
+    /**
+     * 启用图片加载
+     * 
+     * <p>在页面加载完成后调用，用于延迟加载图片，提升页面加载速度</p>
+     * 
+     * @param webView WebView实例
+     */
+    public static void enableImageLoading(WebView webView) {
+        if (webView != null) {
+            WebSettings settings = webView.getSettings();
+            settings.setBlockNetworkImage(false);
+            LogUtils.i(TAG + " Image loading enabled");
+        }
     }
 }

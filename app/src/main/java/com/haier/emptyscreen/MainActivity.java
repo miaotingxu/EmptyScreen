@@ -168,6 +168,8 @@ public class MainActivity extends AppCompatActivity implements CustomWebViewClie
                     mProgressBar.setProgress(newProgress);
                     if (newProgress == 100) {
                         mProgressBar.setVisibility(View.GONE);
+                        // 页面加载完成后启用图片加载
+                        WebViewPerformanceManager.enableImageLoading(view);
                     }
                 }
             }
@@ -663,6 +665,11 @@ public class MainActivity extends AppCompatActivity implements CustomWebViewClie
     protected void onStop() {
         super.onStop();
         LogUtils.i("[MainActivity] onStop");
+        
+        // 开始关闭线程池，避免在onDestroy中才关闭
+        if (mExecutor != null && !mExecutor.isShutdown()) {
+            mExecutor.shutdown();
+        }
     }
 
     private void releaseDialogListeners() {
@@ -710,9 +717,14 @@ public class MainActivity extends AppCompatActivity implements CustomWebViewClie
             WebViewPerformanceManager.safeDestroy(mWebView);
             mWebView = null;
         }
+        if (mWebViewClient != null) {
+            mWebViewClient = null;
+        }
         
-        if (mExecutor != null && !mExecutor.isShutdown()) {
-            mExecutor.shutdownNow();
+        if (mExecutor != null) {
+            if (!mExecutor.isShutdown()) {
+                mExecutor.shutdownNow();
+            }
             mExecutor = null;
         }
         
