@@ -15,7 +15,7 @@ public class PrefsManager {
     private static final String KEY_MEMORY_CLEAN_ENABLED = "memory_clean_enabled";
     private static final String KEY_MEMORY_CLEAN_INTERVAL = "memory_clean_interval";
     
-    private static final String DEFAULT_URL = "https://www.baidu.com";
+    private static final String DEFAULT_URL = "http://192.168.11.42:8096/#/?hospitalCode=4290060102";
     private static final int DEFAULT_BOOT_DELAY = 10;
     private static final int DEFAULT_FOREGROUND_DELAY = 30;
     private static final int DEFAULT_MEMORY_CLEAN_THRESHOLD = 80;

@@ -62,7 +62,8 @@ public class MainActivity extends AppCompatActivity implements CustomWebViewClie
 
     private static final int PERMISSION_REQUEST_CODE = 1001;
     private static final int STORAGE_PERMISSION_REQUEST_CODE = 1002;
-    
+    private static final int SETTING_REQUEST_CODE = 1003;
+
     private static final String[] REQUIRED_PERMISSIONS = {
             Manifest.permission.INTERNET,
             Manifest.permission.ACCESS_NETWORK_STATE,
@@ -149,7 +150,7 @@ public class MainActivity extends AppCompatActivity implements CustomWebViewClie
         mBtnSettings.setOnClickListener(v -> {
             LogUtils.i("[MainActivity] Settings button clicked");
             Intent intent = new Intent(MainActivity.this, SettingsActivity.class);
-            startActivity(intent);
+            startActivityForResult(intent,SETTING_REQUEST_CODE);
         });
     }
 
@@ -311,6 +312,8 @@ public class MainActivity extends AppCompatActivity implements CustomWebViewClie
             } else {
                 Toast.makeText(this, R.string.access_denied, Toast.LENGTH_SHORT).show();
             }
+        }else if (requestCode == SETTING_REQUEST_CODE){
+            loadUrl();
         }
     }
 
