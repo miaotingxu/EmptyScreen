@@ -16,15 +16,42 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        release {
+            storeFile file('111.jks')
+            storePassword "123123"
+            keyAlias "alias"
+            keyPassword "123123"
+        }
+        debug {
+            storeFile file('111.jks')
+            storePassword "123123"
+            keyAlias "alias"
+            keyPassword "123123"
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+        debug {
+            signingConfig signingConfigs.debug
         }
     }
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    applicationVariants.all { variant ->
+        variant.outputs.each { output ->
+            def fileName = "EmptyScreen_v${defaultConfig.versionName}_${new Date().format('yyyyMMdd_HH')}.apk"
+            output.outputFileName = fileName
+        }
     }
 }
 

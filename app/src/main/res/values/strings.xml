@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">EmptyScreen</string>
     <string name="settings">设置</string>
@@ -30,7 +31,7 @@
     <string name="time_settings_saved">时间设置已保存</string>
     <string name="invalid_url">URL格式不正确</string>
     <string name="loading">加载中...</string>
-    
+
     <string name="select_storage_device">选择存储设备</string>
     <string name="storage_devices">存储设备</string>
     <string name="no_storage_device">未检测到存储设备</string>
@@ -39,7 +40,7 @@
     <string name="network_video">网络视频</string>
     <string name="enter_network_url">请输入网络视频URL</string>
     <string name="play_network_video">播放网络视频</string>
-    
+
     <string name="file_browser">文件浏览</string>
     <string name="no_video_files">当前目录没有视频文件</string>
     <string name="select_video">选择视频</string>
@@ -49,7 +50,7 @@
     <string name="loop_folder">循环播放当前文件夹</string>
     <string name="loop_current_video">循环播放当前视频</string>
     <string name="loop_folder_videos">循环播放文件夹内所有视频</string>
-    
+
     <string name="video_play_error">视频播放失败</string>
     <string name="scanning">正在扫描...</string>
     <string name="loading_files">正在加载文件...</string>
@@ -57,7 +58,7 @@
     <string name="file_not_found">文件不存在</string>
     <string name="connected">已连接</string>
     <string name="disconnected">未连接</string>
-    
+
     <string name="memory_clean_settings">内存清理设置</string>
     <string name="auto_memory_clean">自动内存清理</string>
     <string name="clean_threshold">清理阈值</string>
@@ -68,7 +69,7 @@
     <string name="memory_clean_result">释放: %1$s, 清理前: %2$.1f%%, 清理后: %3$.1f%%</string>
     <string name="latest_clean_log">最近清理: %1$s</string>
     <string name="no_clean_record">暂无清理记录</string>
-    
+
     <string name="launcher_subtitle">智能电视全屏展示</string>
     <string name="memory_optimizing">内存优化中...</string>
     <string name="memory_warning">内存占用过高，正在优化</string>
