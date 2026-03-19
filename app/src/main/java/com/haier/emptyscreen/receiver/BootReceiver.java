@@ -8,7 +8,7 @@ import android.content.Intent;
 import android.os.Build;
 import android.os.SystemClock;
 
-import com.haier.emptyscreen.MainActivity;
+import com.haier.emptyscreen.LauncherActivity;
 import com.haier.emptyscreen.utils.LogUtils;
 import com.haier.emptyscreen.utils.PrefsManager;
 
@@ -130,7 +130,7 @@ public class BootReceiver extends BroadcastReceiver {
         LogUtils.i("[BootReceiver] Launching app");
         
         try {
-            Intent launchIntent = new Intent(context, MainActivity.class);
+            Intent launchIntent = new Intent(context, LauncherActivity.class);
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);

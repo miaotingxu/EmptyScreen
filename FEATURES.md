@@ -18,6 +18,7 @@ EmptyScreen是一款专为Android TV/智能电视设计的全屏WebView展示应
 
 ```
 com.haier.emptyscreen/
+├── LauncherActivity.java      # 启动页 - 3秒延时跳转 + 内存监控重启
 ├── MainActivity.java          # 主页面 - WebView全屏展示
 ├── SettingsActivity.java      # 设置页面 - 配置管理
 ├── VideoPlayerActivity.java   # 视频播放页面
@@ -54,6 +55,13 @@ com.haier.emptyscreen/
 └─────────────────┬───────────────────────┘
                   ▼
 ┌─────────────────────────────────────────┐
+│        LauncherActivity (启动页)         │
+│    显示Logo + 3秒延时 + 内存监控          │
+│    内存超80%自动重启优化                  │
+└─────────────────┬───────────────────────┘
+                  │ 3秒后自动跳转
+                  ▼
+┌─────────────────────────────────────────┐
 │           MainActivity (主页)            │
 │         全屏WebView展示网页              │
 │    ┌─────────────────────────────────┐  │
@@ -77,7 +85,31 @@ com.haier.emptyscreen/
 
 ## 三、核心功能模块
 
-### 3.1 MainActivity (主页)
+### 3.1 LauncherActivity (启动页)
+
+**职责**: 启动页展示、3秒延时跳转、内存监控与自动重启
+
+| 功能 | 说明 | 实现方式 |
+|------|------|----------|
+| 启动页展示 | 显示应用Logo、名称和加载进度 | ConstraintLayout居中布局 |
+| 3秒延时跳转 | 固定延时3秒后自动跳转MainActivity | CountDownTimer精确计时 |
+| 内存监控 | 实时检测系统内存占用情况 | Handler定时检查(500ms间隔) |
+| 内存超限重启 | 内存使用率超过80%时自动重启应用 | MemoryCleaner清理 + 进程重启 |
+| 冷启动优化 | 减少白屏时间，提升用户体验 | 专用启动主题 + windowBackground |
+| 横竖屏适配 | 支持不同屏幕方向自适应布局 | layout-land/layout-port布局 |
+
+**交互流程:**
+1. 启动 → 显示Logo和加载动画 → 开始3秒倒计时
+2. 倒计时结束 → 内存正常 → 跳转MainActivity
+3. 内存超80% → 显示优化提示 → 执行内存清理 → 重启LauncherActivity
+
+**内存重启机制:**
+- 检测间隔: 500ms
+- 触发阈值: 80%
+- 处理流程: 清理缓存 → 清理WebView → 执行GC → 重启应用
+- 恢复时间: ≤2秒
+
+### 3.2 MainActivity (主页)
 
 **职责**: 全屏WebView展示、内存监控、视频入口、设置入口
 
@@ -96,7 +128,7 @@ com.haier.emptyscreen/
 3. 按菜单键 → 显示存储选择对话框 → 选择视频 → 播放
 4. 点击设置按钮 → 跳转设置页
 
-### 3.2 SettingsActivity (设置页)
+### 3.3 SettingsActivity (设置页)
 
 **职责**: 应用配置管理、系统信息展示
 
@@ -115,7 +147,7 @@ com.haier.emptyscreen/
 | 内存清理 | 自动清理开关/阈值/间隔/手动清理 | 阈值50-95%/间隔30-300秒 |
 | 系统设置 | 跳转Android系统设置 | - |
 
-### 3.3 VideoPlayerActivity (视频播放)
+### 3.4 VideoPlayerActivity (视频播放)
 
 **职责**: 本地/网络视频播放、遥控器控制
 
@@ -139,7 +171,7 @@ com.haier.emptyscreen/
 | 媒体播放/暂停 | 播放/暂停 |
 | 返回键 | 退出播放 |
 
-### 3.4 ForegroundService (前台服务)
+### 3.5 ForegroundService (前台服务)
 
 **职责**: 前台保活、后台拉起、内存监控
 
@@ -151,7 +183,7 @@ com.haier.emptyscreen/
 | 内存监控 | 定时检查内存使用率 | MemoryUtils |
 | 自动清理 | 内存超阈值时自动清理 | MemoryCleaner |
 
-**目标Activity**: MainActivity, SettingsActivity, VideoPlayerActivity
+**目标Activity**: LauncherActivity, MainActivity, SettingsActivity, VideoPlayerActivity
 
 **工作原理**:
 ```
@@ -161,7 +193,7 @@ com.haier.emptyscreen/
 4. 定时检查内存使用率，超阈值触发清理
 ```
 
-### 3.5 BootReceiver (开机启动)
+### 3.6 BootReceiver (开机启动)
 
 **职责**: 开机后延迟启动应用
 
@@ -414,6 +446,7 @@ android:stateNotNeeded="true"
 | 2026-03-14 | 1.0 | 新增WebViewPerformanceManager，优化复杂网页性能 |
 | 2026-03-14 | 1.0 | 修复内存泄漏问题，完善资源释放机制 |
 | 2026-03-14 | 1.0 | 创建隐患处理计划文档，建立长期监控机制 |
+| 2026-03-16 | 1.0 | 新增LauncherActivity启动页，支持3秒延时跳转和内存监控重启功能 |
 
 ---
 

@@ -36,7 +36,7 @@ public class SettingsActivity extends AppCompatActivity {
     private static final int MIN_DELAY = 30;
     private static final int MAX_DELAY = 500;
     private static final int MIN_THRESHOLD = 50;
-    private static final int MAX_THRESHOLD = 95;
+    private static final int MAX_THRESHOLD = 90;
     private static final int MIN_INTERVAL = 30;
     private static final int MAX_INTERVAL = 300;
     
@@ -497,6 +497,18 @@ public class SettingsActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        LogUtils.i("[SettingsActivity] onStop");
+    }
+
+    @Override
+    protected void onDestroy() {
+        LogUtils.i("[SettingsActivity] onDestroy");
+        super.onDestroy();
     }
 
     @Override

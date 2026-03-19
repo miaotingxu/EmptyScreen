@@ -58,13 +58,13 @@
         tools:targetApi="34">
         
         <activity
-            android:name=".MainActivity"
+            android:name=".LauncherActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
             android:exported="true"
             android:launchMode="singleTask"
             android:screenOrientation="fullSensor"
             android:stateNotNeeded="true"
-            android:theme="@style/Theme.EmptyScreen.Fullscreen">
+            android:theme="@style/Theme.EmptyScreen.Launcher">
             
             <intent-filter android:priority="100">
                 <action android:name="android.intent.action.MAIN" />
@@ -79,6 +79,15 @@
             </intent-filter>
             
         </activity>
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:screenOrientation="fullSensor"
+            android:stateNotNeeded="true"
+            android:theme="@style/Theme.EmptyScreen.Fullscreen" />
 
         <activity
             android:name=".SettingsActivity"
