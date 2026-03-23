@@ -1,10 +1,9 @@
 package com.haier.emptyscreen;
 
-import android.app.ActivityManager;
-import android.content.Context;
+import android.app.Activity;
 import android.content.Intent;
+import android.os.Build;
 import android.os.Bundle;
-import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
@@ -12,204 +11,134 @@ import android.view.WindowManager;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import androidx.appcompat.app.AppCompatActivity;
-
+import com.haier.emptyscreen.service.ForegroundService;
 import com.haier.emptyscreen.utils.LogUtils;
 import com.haier.emptyscreen.utils.MemoryCleaner;
 import com.haier.emptyscreen.utils.MemoryUtils;
+import com.haier.emptyscreen.utils.PrefsManager;
 
-public class LauncherActivity extends AppCompatActivity {
+public class LauncherActivity extends Activity {
 
-    private static final String TAG = "LauncherActivity";
-    private static final long LAUNCH_DELAY_MS = 3000;
-    private static final float MEMORY_THRESHOLD = 80.0f;
-    private static final long MEMORY_CHECK_INTERVAL_MS = 500;
+    private static final String TAG = "[LauncherActivity]";
 
     private ProgressBar mProgressBar;
-    private TextView mTvMemoryWarning;
-    
-    private CountDownTimer mLaunchTimer;
-    private Handler mMemoryCheckHandler;
-    private Runnable mMemoryCheckRunnable;
-    private boolean mIsLaunching = false;
-    private boolean mMemoryWarningShown = false;
+    private TextView mMemoryWarningText;
+
+    private PrefsManager mPrefsManager;
+    private Handler mHandler;
+
+    private boolean mIsDestroyed = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setupFullscreenMode();
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            getWindow().addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
+            getWindow().clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_NAVIGATION);
+        }
+
         setContentView(R.layout.activity_launcher);
-        
-        initViews();
-        setupMemoryMonitor();
-        startLaunchTimer();
-        
-        LogUtils.i("[" + TAG + "] Created");
-    }
-    
-    private void setupFullscreenMode() {
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+
+        mPrefsManager = PrefsManager.getInstance(this);
+        mHandler = new Handler(Looper.getMainLooper());
+
+        initializeViews();
+
+        startForegroundService();
+
+        checkMemoryAndContinue();
     }
 
-    private void initViews() {
+    private void initializeViews() {
         mProgressBar = findViewById(R.id.progress_bar);
-        mTvMemoryWarning = findViewById(R.id.tv_memory_warning);
+        mMemoryWarningText = findViewById(R.id.tv_memory_warning);
     }
 
-    private void setupMemoryMonitor() {
-        mMemoryCheckHandler = new Handler(Looper.getMainLooper());
-        mMemoryCheckRunnable = new Runnable() {
-            @Override
-            public void run() {
-                checkMemoryAndHandle();
-                if (!mIsLaunching) {
-                    mMemoryCheckHandler.postDelayed(this, MEMORY_CHECK_INTERVAL_MS);
-                }
-            }
-        };
-        mMemoryCheckHandler.post(mMemoryCheckRunnable);
+    private void startForegroundService() {
+        Intent serviceIntent = new Intent(this, ForegroundService.class);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
+        LogUtils.d(TAG + " ForegroundService started");
     }
 
-    private void checkMemoryAndHandle() {
-        float memoryUsage = MemoryUtils.getSystemMemoryUsagePercent(this);
-        
-        if (memoryUsage >= MEMORY_THRESHOLD) {
-            handleHighMemoryUsage(memoryUsage);
-        } else if (mMemoryWarningShown) {
-            mTvMemoryWarning.setVisibility(View.GONE);
-            mMemoryWarningShown = false;
+    private void checkMemoryAndContinue() {
+        int threshold = mPrefsManager.getMemoryCleanThreshold();
+        float currentUsage = MemoryUtils.getSystemMemoryUsagePercent(this);
+
+        if (currentUsage >= threshold) {
+            performMemoryCleanup(threshold);
+        } else {
+            proceedToMain();
         }
     }
 
-    private void handleHighMemoryUsage(float memoryUsage) {
-        LogUtils.w("[" + TAG + "] High memory: " + String.format("%.1f%%", memoryUsage));
-        
-        if (!mMemoryWarningShown) {
-            mTvMemoryWarning.setVisibility(View.VISIBLE);
-            mMemoryWarningShown = true;
-        }
-        
-        if (!mIsLaunching) {
-            mIsLaunching = true;
-            if (mLaunchTimer != null) {
-                mLaunchTimer.cancel();
-            }
-            performMemoryCleanupAndRestart();
+    private void performMemoryCleanup(int threshold) {
+        LogUtils.w(TAG + " Memory usage >= " + threshold + "%, cleaning up...");
+
+        showMemoryWarning("正在优化内存...");
+
+        MemoryCleaner.CleanResult result = MemoryCleaner.cleanMemory(this);
+
+        float afterPercent = result.afterPercent;
+        if (afterPercent >= threshold) {
+            showMemoryWarning("内存占用过高，正在重启...");
+            restartAppDelayed();
+        } else {
+            proceedToMain();
         }
     }
 
-    private void performMemoryCleanupAndRestart() {
-        LogUtils.i("[" + TAG + "] Cleanup and restart");
-        
-        new Thread(() -> {
-            MemoryCleaner.cleanMemory(this);
-            try {
-                Thread.sleep(500);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-            runOnUiThread(this::restartApplication);
-        }).start();
-    }
-
-    private void restartApplication() {
-        ActivityManager activityManager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-        if (activityManager != null) {
-            activityManager.killBackgroundProcesses(getPackageName());
+    private void showMemoryWarning(String message) {
+        if (!mIsDestroyed && mMemoryWarningText != null) {
+            mMemoryWarningText.setText(message);
+            mMemoryWarningText.setVisibility(View.VISIBLE);
         }
-        
-        Intent intent = new Intent(this, LauncherActivity.class);
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        
-        finish();
-        Runtime.getRuntime().exit(0);
     }
 
-    private void startLaunchTimer() {
-        mLaunchTimer = new CountDownTimer(LAUNCH_DELAY_MS, 100) {
-            @Override
-            public void onTick(long millisUntilFinished) {
+    private void restartAppDelayed() {
+        mHandler.postDelayed(() -> {
+            if (!mIsDestroyed) {
+                EmptyScreenApplication.getInstance().restartApp();
             }
+        }, 2000);
+    }
 
-            @Override
-            public void onFinish() {
-                if (!mIsLaunching) {
-                    launchMainActivity();
-                }
+    private void proceedToMain() {
+        int delaySeconds = mPrefsManager.getBootDelaySeconds();
+        long delayMillis = delaySeconds * 1000L;
+
+        LogUtils.i(TAG + " Will launch MainActivity after " + delaySeconds + " seconds");
+
+        mHandler.postDelayed(() -> {
+            if (!mIsDestroyed) {
+                launchMainActivity();
             }
-        };
-        mLaunchTimer.start();
+        }, delayMillis);
     }
 
     private void launchMainActivity() {
-        mIsLaunching = true;
-        
-        float memoryUsage = MemoryUtils.getSystemMemoryUsagePercent(this);
-        if (memoryUsage >= MEMORY_THRESHOLD) {
-            LogUtils.w("[" + TAG + "] Memory still high: " + String.format("%.1f%%", memoryUsage));
-            performMemoryCleanupAndRestart();
-            return;
+        try {
+            Intent intent = new Intent(LauncherActivity.this, MainActivity.class);
+            startActivity(intent);
+            finish();
+            overridePendingTransition(R.anim.fade_in, R.anim.fade_out);
+            LogUtils.i(TAG + " Launched MainActivity successfully");
+        } catch (Exception e) {
+            LogUtils.e(TAG + " Failed to launch MainActivity: " + e.getMessage());
         }
-        
-        LogUtils.i("[" + TAG + "] Launching MainActivity");
-        startActivity(new Intent(this, MainActivity.class));
-        finish();
-        overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
-    }
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        if (mMemoryCheckHandler != null && mMemoryCheckRunnable != null) {
-            mMemoryCheckHandler.post(mMemoryCheckRunnable);
-        }
-    }
-
-    @Override
-    protected void onPause() {
-        super.onPause();
-        if (mMemoryCheckHandler != null && mMemoryCheckRunnable != null) {
-            mMemoryCheckHandler.removeCallbacks(mMemoryCheckRunnable);
-        }
-    }
-
-    @Override
-    protected void onStop() {
-        super.onStop();
-        LogUtils.i("[" + TAG + "] onStop");
     }
 
     @Override
     protected void onDestroy() {
-        LogUtils.i("[" + TAG + "] onDestroy");
-        
-        if (mLaunchTimer != null) {
-            mLaunchTimer.cancel();
-            mLaunchTimer = null;
+        mIsDestroyed = true;
+        if (mHandler != null) {
+            mHandler.removeCallbacksAndMessages(null);
         }
-        
-        if (mMemoryCheckHandler != null) {
-            mMemoryCheckHandler.removeCallbacksAndMessages(null);
-            mMemoryCheckHandler = null;
-        }
-        mMemoryCheckRunnable = null;
-        
         super.onDestroy();
-    }
-
-    @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        if (hasFocus) {
-            setupFullscreenMode();
-        }
     }
 }

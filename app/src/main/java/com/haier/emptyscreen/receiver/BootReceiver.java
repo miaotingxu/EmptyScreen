@@ -14,42 +14,11 @@ import com.haier.emptyscreen.utils.PrefsManager;
 
 /**
  * 开机启动接收器 - 负责设备开机后延迟启动应用
- * 
- * <p>核心功能：</p>
- * <ul>
- *   <li>接收开机完成广播</li>
- *   <li>使用AlarmManager延迟启动应用（解决进程被杀死问题）</li>
- *   <li>支持多种开机广播（兼容不同厂商）</li>
- * </ul>
- * 
- * <p>支持的广播：</p>
- * <ul>
- *   <li>android.intent.action.BOOT_COMPLETED - 标准开机广播</li>
- *   <li>android.intent.action.QUICKBOOT_POWERON - 快速启动广播</li>
- *   <li>com.htc.intent.action.QUICKBOOT_POWERON - HTC设备快速启动</li>
- * </ul>
- * 
- * <p>工作原理：</p>
- * <ol>
- *   <li>接收到开机广播后，使用AlarmManager设置延迟闹钟</li>
- *   <li>闹钟触发时发送自定义广播ACTION_LAUNCH_APP</li>
- *   <li>接收到自定义广播后启动MainActivity</li>
- * </ol>
- * 
- * <p>为什么使用AlarmManager而不是Handler.postDelayed？</p>
- * <p>因为BroadcastReceiver.onReceive()执行完毕后，如果进程没有其他组件运行，
- * 系统会立即杀死进程，Handler的延迟任务会随进程死亡而被清除。
- * 使用AlarmManager可以确保即使进程被杀死，系统也会在指定时间唤醒应用。</p>
- * 
- * @author EmptyScreen Team
- * @version 1.0
  */
 public class BootReceiver extends BroadcastReceiver {
 
-    /** 自定义启动应用的Action */
     private static final String ACTION_LAUNCH_APP = "com.haier.emptyscreen.ACTION_LAUNCH_APP";
     
-    /** PendingIntent请求码 */
     private static final int LAUNCH_REQUEST_CODE = 1001;
 
     @Override
@@ -72,6 +41,9 @@ public class BootReceiver extends BroadcastReceiver {
         }
     }
 
+    /**
+     * 调度应用启动（使用 AlarmManager 延迟启动）
+     */
     private void scheduleAppLaunch(Context context) {
         LogUtils.i("[BootReceiver] Scheduling app launch");
 
@@ -126,6 +98,9 @@ public class BootReceiver extends BroadcastReceiver {
         }
     }
 
+    /**
+     * 启动应用
+     */
     private void launchApp(Context context) {
         LogUtils.i("[BootReceiver] Launching app");
         

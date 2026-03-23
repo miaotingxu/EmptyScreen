@@ -27,6 +27,9 @@ import com.haier.emptyscreen.utils.LogUtils;
 import com.haier.emptyscreen.utils.MemoryUtils;
 import com.haier.emptyscreen.utils.PrefsManager;
 
+/**
+ * 前台服务 - 保持应用运行并监控内存
+ */
 public class ForegroundService extends Service {
 
     private static final String CHANNEL_ID = "empty_screen_service";
@@ -42,6 +45,9 @@ public class ForegroundService extends Service {
     private boolean mIsAppInForeground = true;
     private boolean mIsBringToFrontScheduled = false;
 
+    /**
+     * 判断是否为目标 Activity
+     */
     private boolean isTargetActivity(Activity activity) {
         return activity instanceof MainActivity ||
                 activity instanceof SettingsActivity ||
@@ -68,6 +74,9 @@ public class ForegroundService extends Service {
         LogUtils.i("[ForegroundService] Started (event-driven mode)");
     }
 
+    /**
+     * 设置 Activity 生命周期回调
+     */
     private void setupLifecycleCallbacks() {
         mLifecycleCallbacks = new Application.ActivityLifecycleCallbacks() {
             @Override
@@ -119,6 +128,9 @@ public class ForegroundService extends Service {
         getApplication().registerActivityLifecycleCallbacks(mLifecycleCallbacks);
     }
 
+    /**
+     * 调度将应用带回前台的任务
+     */
     private void scheduleBringToFrontTask() {
         if (mIsBringToFrontScheduled) {
             return;
@@ -139,6 +151,9 @@ public class ForegroundService extends Service {
         mIsBringToFrontScheduled = true;
     }
 
+    /**
+     * 取消带回前台的任务
+     */
     private void cancelBringToFrontTask() {
         if (mIsBringToFrontScheduled && mBringToFrontRunnable != null) {
             mHandler.removeCallbacks(mBringToFrontRunnable);
@@ -173,6 +188,9 @@ public class ForegroundService extends Service {
         super.onDestroy();
     }
 
+    /**
+     * 创建通知渠道
+     */
     private void createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             NotificationChannel channel = new NotificationChannel(
@@ -180,7 +198,7 @@ public class ForegroundService extends Service {
                     getString(R.string.app_name),
                     NotificationManager.IMPORTANCE_LOW
             );
-            channel.setDescription("EmptyScreen运行服务");
+            channel.setDescription("EmptyScreen 运行服务");
             channel.setShowBadge(false);
 
             NotificationManager manager = getSystemService(NotificationManager.class);
@@ -190,6 +208,9 @@ public class ForegroundService extends Service {
         }
     }
 
+    /**
+     * 创建通知
+     */
     private Notification createNotification() {
         Intent notificationIntent = new Intent(this, LauncherActivity.class);
         PendingIntent pendingIntent = PendingIntent.getActivity(
@@ -207,6 +228,9 @@ public class ForegroundService extends Service {
                 .build();
     }
 
+    /**
+     * 设置内存检查
+     */
     private void setupMemoryCheck() {
         mMemoryCheckRunnable = new Runnable() {
             @Override
@@ -219,6 +243,9 @@ public class ForegroundService extends Service {
         mHandler.post(mMemoryCheckRunnable);
     }
 
+    /**
+     * 检查内存使用情况
+     */
     private void checkMemory() {
         if (!mPrefsManager.isMemoryCleanEnabled()) {
             return;
@@ -234,6 +261,9 @@ public class ForegroundService extends Service {
         }
     }
 
+    /**
+     * 将应用带回前台
+     */
     private void bringAppToFront() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
@@ -246,6 +276,9 @@ public class ForegroundService extends Service {
         }
     }
 
+    /**
+     * 直接启动应用
+     */
     private void bringAppToFrontDirectly() {
         Intent intent = new Intent(this, LauncherActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -254,6 +287,9 @@ public class ForegroundService extends Service {
         startActivity(intent);
     }
 
+    /**
+     * 通过通知将应用带回前台（Android 10+）
+     */
     private void bringAppToFrontWithNotification() {
         Intent intent = new Intent(this, LauncherActivity.class);
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);

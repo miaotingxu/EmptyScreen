@@ -17,83 +17,27 @@ import java.util.Locale;
 
 /**
  * 内存清理工具类 - 提供自动和手动内存清理功能
- * 
- * <p>核心功能：</p>
- * <ul>
- *   <li>应用缓存清理：清理内部/外部存储缓存目录</li>
- *   <li>WebView缓存清理：清理网页缓存、历史记录、表单数据</li>
- *   <li>Dalvik GC：触发虚拟机垃圾回收</li>
- *   <li>Runtime GC：触发运行时垃圾回收</li>
- *   <li>清理日志：记录每次清理的详细信息</li>
- * </ul>
- * 
- * <p>使用场景：</p>
- * <ol>
- *   <li>自动清理：ForegroundService定时检查内存使用率，超阈值时自动触发</li>
- *   <li>手动清理：用户在设置页面点击"立即清理"按钮</li>
- *   <li>系统压力：响应onTrimMemory回调，释放相应级别的资源</li>
- * </ol>
- * 
- * <p>注意事项：</p>
- * <ul>
- *   <li>清理操作在子线程执行，避免阻塞主线程</li>
- *   <li>清理过程不会影响应用核心功能</li>
- *   <li>清理日志最多保留50条</li>
- * </ul>
- * 
- * @author EmptyScreen Team
- * @version 1.0
  */
 public class MemoryCleaner {
 
-    /** 日志标签 */
     private static final String TAG = "[MemoryCleaner]";
     
-    /** 日期格式化器 */
     private static final SimpleDateFormat sDateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault());
     
-    /** 清理日志列表 */
     private static List<CleanLog> sCleanLogs = new ArrayList<>();
     
-    /** 最大日志数量 */
     private static final int MAX_LOG_COUNT = 20;
 
     /**
      * 清理日志数据类
-     * 
-     * <p>记录每次清理操作的详细信息，包括：</p>
-     * <ul>
-     *   <li>清理时间</li>
-     *   <li>清理前后内存使用率</li>
-     *   <li>释放的字节数</li>
-     *   <li>清理的项目列表</li>
-     * </ul>
      */
     public static class CleanLog {
-        /** 清理时间戳 */
         public String timestamp;
-        
-        /** 清理前内存使用率（百分比） */
         public float beforePercent;
-        
-        /** 清理后内存使用率（百分比） */
         public float afterPercent;
-        
-        /** 释放的字节数 */
         public long freedBytes;
-        
-        /** 清理的项目描述 */
         public String cleanedItems;
         
-        /**
-         * 构造函数
-         * 
-         * @param timestamp 清理时间戳
-         * @param beforePercent 清理前内存使用率
-         * @param afterPercent 清理后内存使用率
-         * @param freedBytes 释放的字节数
-         * @param cleanedItems 清理的项目描述
-         */
         public CleanLog(String timestamp, float beforePercent, float afterPercent, long freedBytes, String cleanedItems) {
             this.timestamp = timestamp;
             this.beforePercent = beforePercent;
@@ -105,40 +49,14 @@ public class MemoryCleaner {
 
     /**
      * 清理结果数据类
-     * 
-     * <p>返回清理操作的执行结果，包括：</p>
-     * <ul>
-     *   <li>是否成功</li>
-     *   <li>释放的字节数</li>
-     *   <li>清理前后内存使用率</li>
-     *   <li>清理的项目列表</li>
-     * </ul>
      */
     public static class CleanResult {
-        /** 是否成功 */
         public boolean success;
-        
-        /** 释放的字节数 */
         public long freedBytes;
-        
-        /** 清理前内存使用率（百分比） */
         public float beforePercent;
-        
-        /** 清理后内存使用率（百分比） */
         public float afterPercent;
-        
-        /** 清理的项目描述 */
         public String cleanedItems;
         
-        /**
-         * 构造函数
-         * 
-         * @param success 是否成功
-         * @param freedBytes 释放的字节数
-         * @param beforePercent 清理前内存使用率
-         * @param afterPercent 清理后内存使用率
-         * @param cleanedItems 清理的项目描述
-         */
         public CleanResult(boolean success, long freedBytes, float beforePercent, float afterPercent, String cleanedItems) {
             this.success = success;
             this.freedBytes = freedBytes;
@@ -148,6 +66,12 @@ public class MemoryCleaner {
         }
     }
 
+    /**
+     * 执行内存清理
+     * 
+     * @param context 上下文
+     * @return 清理结果
+     */
     public static CleanResult cleanMemory(Context context) {
         LogUtils.i(TAG + " Starting memory cleanup...");
 
@@ -157,11 +81,8 @@ public class MemoryCleaner {
         StringBuilder cleanedItems = new StringBuilder();
 
         cleanAppCache(context, cleanedItems);
-
         cleanWebViewCache(cleanedItems);
-
         cleanDalvikCache(cleanedItems);
-
         triggerGC(cleanedItems);
 
         long afterUsed = MemoryUtils.getUsedMemory(context);
@@ -174,7 +95,6 @@ public class MemoryCleaner {
             itemsStr = itemsStr.substring(0, itemsStr.length() - 2);
         }
         
-        // 限制清理项目描述的长度，防止内存占用过高
         if (itemsStr.length() > 200) {
             itemsStr = itemsStr.substring(0, 200) + "...";
         }
@@ -190,6 +110,9 @@ public class MemoryCleaner {
         return new CleanResult(true, freedBytes, beforePercent, afterPercent, itemsStr);
     }
 
+    /**
+     * 清理应用缓存
+     */
     private static void cleanAppCache(Context context, StringBuilder cleanedItems) {
         try {
             File cacheDir = context.getCacheDir();
@@ -220,6 +143,9 @@ public class MemoryCleaner {
         }
     }
 
+    /**
+     * 清理 WebView 缓存
+     */
     private static void cleanWebViewCache(StringBuilder cleanedItems) {
         try {
             Context context = LogUtils.getApplicationContext();
@@ -248,6 +174,9 @@ public class MemoryCleaner {
         }
     }
 
+    /**
+     * 清理 Dalvik 缓存
+     */
     private static void cleanDalvikCache(StringBuilder cleanedItems) {
         try {
             long beforeMemory = Debug.getNativeHeapAllocatedSize();
@@ -255,7 +184,6 @@ public class MemoryCleaner {
             System.runFinalization();
             System.gc();
 
-            // 使用可中断的sleep
             try {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
@@ -275,6 +203,9 @@ public class MemoryCleaner {
         }
     }
 
+    /**
+     * 触发垃圾回收
+     */
     private static void triggerGC(StringBuilder cleanedItems) {
         try {
             Runtime runtime = Runtime.getRuntime();
@@ -283,7 +214,6 @@ public class MemoryCleaner {
             runtime.gc();
             System.gc();
 
-            // 使用可中断的sleep
             try {
                 Thread.sleep(50);
             } catch (InterruptedException e) {
@@ -302,6 +232,9 @@ public class MemoryCleaner {
         }
     }
 
+    /**
+     * 获取目录大小
+     */
     private static long getDirSize(File dir) {
         if (dir == null || !dir.exists()) return 0;
 
@@ -319,6 +252,9 @@ public class MemoryCleaner {
         return size;
     }
 
+    /**
+     * 删除目录内容
+     */
     private static void deleteDirContents(File dir) {
         if (dir == null || !dir.exists()) return;
 
@@ -335,6 +271,9 @@ public class MemoryCleaner {
         }
     }
 
+    /**
+     * 添加清理日志
+     */
     private static void addCleanLog(CleanLog log) {
         sCleanLogs.add(0, log);
         if (sCleanLogs.size() > MAX_LOG_COUNT) {
@@ -342,10 +281,16 @@ public class MemoryCleaner {
         }
     }
 
+    /**
+     * 获取所有清理日志
+     */
     public static List<CleanLog> getCleanLogs() {
         return new ArrayList<>(sCleanLogs);
     }
 
+    /**
+     * 获取最新清理日志
+     */
     public static String getLatestCleanLog() {
         if (sCleanLogs.isEmpty()) {
             return "No cleanup records";
@@ -357,6 +302,13 @@ public class MemoryCleaner {
                 MemoryUtils.formatSize(latest.freedBytes), latest.cleanedItems);
     }
 
+    /**
+     * 判断是否需要清理内存
+     * 
+     * @param context 上下文
+     * @param thresholdPercent 阈值百分比
+     * @return true-需要清理；false-不需要
+     */
     public static boolean shouldCleanMemory(Context context, int thresholdPercent) {
         float currentPercent = MemoryUtils.getSystemMemoryUsagePercent(context);
         boolean shouldClean = currentPercent >= thresholdPercent;
@@ -368,5 +320,4 @@ public class MemoryCleaner {
 
         return shouldClean;
     }
-
 }

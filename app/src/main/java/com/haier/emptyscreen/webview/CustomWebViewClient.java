@@ -1,209 +1,87 @@
 package com.haier.emptyscreen.webview;
 
 import android.app.Activity;
-import android.content.Context;
-import android.graphics.Bitmap;
-import android.net.http.SslError;
 import android.view.View;
-import android.webkit.ClientCertRequest;
-import android.webkit.SslErrorHandler;
-import android.webkit.WebResourceError;
-import android.webkit.WebResourceRequest;
-import android.webkit.WebResourceResponse;
+import android.webkit.WebChromeClient;
 import android.webkit.WebView;
-import android.webkit.WebViewClient;
-import android.widget.Button;
-import android.widget.LinearLayout;
-import android.widget.ProgressBar;
-import android.widget.TextView;
+import android.widget.FrameLayout;
 
 import com.haier.emptyscreen.utils.LogUtils;
 
-/**
- * 自定义WebViewClient - 处理页面加载、错误和性能优化
- * 
- * <p>核心功能：</p>
- * <ul>
- *   <li>页面加载状态管理</li>
- *   <li>错误处理和显示</li>
- *   <li>性能优化注入</li>
- *   <li>定时器监控</li>
- * </ul>
- */
-public class CustomWebViewClient extends WebViewClient {
-    
-    private final Context mContext;
-    private final ProgressBar mProgressBar;
-    private final LinearLayout mErrorLayout;
-    private final TextView mTvErrorMessage;
-    private final Button mBtnRetry;
-    private final WebViewErrorCallback mCallback;
-    
-    private boolean mHasError = false;
-    
-    /**
-     * 错误回调接口
-     */
-    public interface WebViewErrorCallback {
-        void onRetry();
+public class CustomWebViewClient extends android.webkit.WebViewClient {
+
+    private static final String TAG = "[CustomWebViewClient]";
+
+    private Activity mActivity;
+    private WebView mWebView;
+    private FrameLayout mVideoContainer;
+    private View mCustomView;
+    private WebChromeClient.CustomViewCallback mCustomViewCallback;
+
+    public CustomWebViewClient(Activity activity, WebView webView, FrameLayout videoContainer) {
+        mActivity = activity;
+        mWebView = webView;
+        mVideoContainer = videoContainer;
     }
-    
-    public CustomWebViewClient(Context context, ProgressBar progressBar, 
-                               LinearLayout errorLayout, TextView tvErrorMessage,
-                               Button btnRetry, WebViewErrorCallback callback) {
-        mContext = context;
-        mProgressBar = progressBar;
-        mErrorLayout = errorLayout;
-        mTvErrorMessage = tvErrorMessage;
-        mBtnRetry = btnRetry;
-        mCallback = callback;
-        
-        if (mBtnRetry != null && mCallback != null) {
-            mBtnRetry.setOnClickListener(v -> {
-                hideError();
-                mCallback.onRetry();
-            });
-        }
-    }
-    
+
     @Override
-    public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
-        String url = request.getUrl().toString();
-        LogUtils.d("[CustomWebViewClient] shouldOverrideUrlLoading: " + url);
-        
-        if (url.startsWith("http://") || url.startsWith("https://")) {
-            return false;
-        }
-        
-        LogUtils.w("[CustomWebViewClient] Blocked non-http(s) URL: " + url);
-        return true;
+    public boolean shouldOverrideUrlLoading(WebView view, String url) {
+        LogUtils.d(TAG + " Loading URL: " + url);
+        return false;
     }
-    
-    @Override
-    public void onPageStarted(WebView view, String url, Bitmap favicon) {
-        super.onPageStarted(view, url, favicon);
-        LogUtils.i("[CustomWebViewClient] Page started loading: " + url);
-        mHasError = false;
-        hideError();
-        if (mProgressBar != null) {
-            mProgressBar.setVisibility(View.VISIBLE);
-            mProgressBar.setProgress(0);
+
+    public void onShowCustomView(View view, WebChromeClient.CustomViewCallback callback) {
+        if (mCustomView != null) {
+            callback.onCustomViewHidden();
+            return;
         }
+
+        if (mVideoContainer == null) {
+            callback.onCustomViewHidden();
+            return;
+        }
+
+        mCustomView = view;
+        mCustomViewCallback = callback;
+
+        mVideoContainer.addView(view);
+        mVideoContainer.setVisibility(View.VISIBLE);
+
+        setSystemUiVisibility(true);
+        
+        LogUtils.d(TAG + " Entered fullscreen mode");
     }
-    
-    @Override
-    public void onPageFinished(WebView view, String url) {
-        super.onPageFinished(view, url);
-        LogUtils.i("[CustomWebViewClient] Page finished loading: " + url);
-        
-        if (mProgressBar != null) {
-            mProgressBar.setVisibility(View.GONE);
+
+    public void onHideCustomView() {
+        if (mCustomView == null) {
+            return;
         }
-        if (!mHasError) {
-            hideError();
+
+        if (mVideoContainer != null) {
+            mVideoContainer.removeView(mCustomView);
+            mVideoContainer.setVisibility(View.GONE);
         }
+        mCustomView = null;
+        mCustomViewCallback.onCustomViewHidden();
+
+        setSystemUiVisibility(false);
         
-        WebViewPerformanceManager.injectTimerMonitor(view);
-        
-        LogUtils.i("[CustomWebViewClient] Timer monitor injected for: " + url);
+        LogUtils.d(TAG + " Exited fullscreen mode");
     }
-    
-    @Override
-    public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-        super.onReceivedError(view, request, error);
-        
-        if (request.isForMainFrame()) {
-            mHasError = true;
-            String errorMessage = "页面加载失败";
-            if (error.getDescription() != null) {
-                errorMessage = error.getDescription().toString();
+
+    private void setSystemUiVisibility(boolean fullscreen) {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
+            int visibility = View.SYSTEM_UI_FLAG_LAYOUT_STABLE |
+                    View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION |
+                    View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+
+            if (fullscreen) {
+                visibility |= View.SYSTEM_UI_FLAG_HIDE_NAVIGATION |
+                        View.SYSTEM_UI_FLAG_FULLSCREEN |
+                        View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
             }
-            LogUtils.e("[CustomWebViewClient] Received error for main frame: " + errorMessage);
-            showError(errorMessage);
+
+            mActivity.getWindow().getDecorView().setSystemUiVisibility(visibility);
         }
-    }
-    
-    @Override
-    public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
-        super.onReceivedHttpError(view, request, errorResponse);
-        
-        if (request.isForMainFrame()) {
-            mHasError = true;
-            int statusCode = errorResponse.getStatusCode();
-            String reason = errorResponse.getReasonPhrase();
-            String errorMessage = "HTTP错误: " + statusCode;
-            if (reason != null) {
-                errorMessage += " - " + reason;
-            }
-            LogUtils.e("[CustomWebViewClient] Received HTTP error: " + statusCode + " " + reason);
-            showError(errorMessage);
-        }
-    }
-    
-    @Override
-    public void onReceivedSslError(WebView view, SslErrorHandler handler, SslError error) {
-        super.onReceivedSslError(view, handler, error);
-        
-        String errorMessage = "SSL证书错误";
-        switch (error.getPrimaryError()) {
-            case SslError.SSL_NOTYETVALID:
-                errorMessage = "SSL证书尚未生效";
-                break;
-            case SslError.SSL_EXPIRED:
-                errorMessage = "SSL证书已过期";
-                break;
-            case SslError.SSL_IDMISMATCH:
-                errorMessage = "SSL证书域名不匹配";
-                break;
-            case SslError.SSL_UNTRUSTED:
-                errorMessage = "SSL证书不受信任";
-                break;
-            case SslError.SSL_DATE_INVALID:
-                errorMessage = "SSL证书日期无效";
-                break;
-            case SslError.SSL_INVALID:
-                errorMessage = "SSL证书无效";
-                break;
-        }
-        
-        LogUtils.e("[CustomWebViewClient] SSL Error: " + errorMessage + " for URL: " + view.getUrl());
-        
-        handler.cancel();
-        
-        mHasError = true;
-        showError(errorMessage);
-    }
-    
-    @Override
-    public void onReceivedClientCertRequest(WebView view, ClientCertRequest request) {
-        super.onReceivedClientCertRequest(view, request);
-        LogUtils.w("[CustomWebViewClient] Client certificate request received for: " + view.getUrl());
-    }
-    
-    private void showError(String message) {
-        if (mContext instanceof Activity) {
-            ((Activity) mContext).runOnUiThread(() -> {
-                if (mErrorLayout != null) {
-                    mErrorLayout.setVisibility(View.VISIBLE);
-                }
-                if (mTvErrorMessage != null) {
-                    mTvErrorMessage.setText(message);
-                }
-            });
-        }
-    }
-    
-    private void hideError() {
-        if (mContext instanceof Activity) {
-            ((Activity) mContext).runOnUiThread(() -> {
-                if (mErrorLayout != null) {
-                    mErrorLayout.setVisibility(View.GONE);
-                }
-            });
-        }
-    }
-    
-    public boolean hasError() {
-        return mHasError;
     }
 }
