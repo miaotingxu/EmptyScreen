@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageButton;
 import android.widget.SeekBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -28,8 +29,8 @@ public class SettingsActivity extends Activity {
     private Button mSaveButton;
     private Button mSaveTimeSettingsButton;
     private Button mCleanNowButton;
-    private Button mSystemSettingsButton;
-    private Button mBackButton;
+    private ImageButton mSystemSettingsButton;
+    private ImageButton mBackButton;
 
     private SwitchCompat mMemoryCleanEnabledSwitch;
     private SeekBar mThresholdSeekBar;
@@ -96,10 +97,12 @@ public class SettingsActivity extends Activity {
             }
 
             @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {}
+            public void onStartTrackingTouch(SeekBar seekBar) {
+            }
 
             @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {}
+            public void onStopTrackingTouch(SeekBar seekBar) {
+            }
         });
     }
 
@@ -204,7 +207,7 @@ public class SettingsActivity extends Activity {
 
             runOnUiThread(() -> {
                 String message = String.format("清理完成，释放 %s",
-                    formatFileSize(result.freedBytes));
+                        formatFileSize(result.freedBytes));
                 Toast.makeText(this, message, Toast.LENGTH_LONG).show();
                 mCleanLogText.setText("最近清理: " + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date()));
                 mCleanLogText.setVisibility(View.VISIBLE);

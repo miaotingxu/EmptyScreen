@@ -50,7 +50,7 @@ public class PrefsManager {
     private static final String KEY_MEMORY_CLEAN_INTERVAL = "memory_clean_interval";
     
     /** 默认 URL（内网测试地址） */
-    private static final String DEFAULT_URL = "http://192.168.11.42:8096/#/?hospitalCode=4290060102";
+    private static final String DEFAULT_URL = "https://www.baidu.com";
     
     /** 默认开机延迟（10 秒） */
     private static final int DEFAULT_BOOT_DELAY = 10;
