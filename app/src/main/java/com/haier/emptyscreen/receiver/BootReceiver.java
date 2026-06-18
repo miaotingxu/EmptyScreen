@@ -18,7 +18,7 @@ import com.haier.emptyscreen.utils.PrefsManager;
 public class BootReceiver extends BroadcastReceiver {
 
     private static final String ACTION_LAUNCH_APP = "com.haier.emptyscreen.ACTION_LAUNCH_APP";
-    
+
     private static final int LAUNCH_REQUEST_CODE = 1001;
 
     @Override
@@ -30,11 +30,11 @@ public class BootReceiver extends BroadcastReceiver {
 
         String action = intent.getAction();
         LogUtils.i("[BootReceiver] Received broadcast: " + action);
-
         if (Intent.ACTION_BOOT_COMPLETED.equals(action) ||
-            "android.intent.action.QUICKBOOT_POWERON".equals(action) ||
-            "com.htc.intent.action.QUICKBOOT_POWERON".equals(action)) {
-            
+                "android.intent.action.SCREEN_ON".equals(action) ||
+                "android.intent.action.QUICKBOOT_POWERON".equals(action) ||
+                "com.htc.intent.action.QUICKBOOT_POWERON".equals(action)) {
+
             scheduleAppLaunch(context);
         } else if (ACTION_LAUNCH_APP.equals(action)) {
             launchApp(context);
@@ -61,7 +61,7 @@ public class BootReceiver extends BroadcastReceiver {
 
         Intent launchIntent = new Intent(context, BootReceiver.class);
         launchIntent.setAction(ACTION_LAUNCH_APP);
-        
+
         PendingIntent pendingIntent = PendingIntent.getBroadcast(
                 context,
                 LAUNCH_REQUEST_CODE,
@@ -103,7 +103,7 @@ public class BootReceiver extends BroadcastReceiver {
      */
     private void launchApp(Context context) {
         LogUtils.i("[BootReceiver] Launching app");
-        
+
         try {
             Intent launchIntent = new Intent(context, LauncherActivity.class);
             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
