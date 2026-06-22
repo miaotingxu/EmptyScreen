@@ -113,15 +113,19 @@
         <receiver
             android:name=".receiver.BootReceiver"
             android:enabled="true"
-            android:exported="true">
+            android:exported="true"
+            android:directBootAware="true">
             <intent-filter android:priority="1000">
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
                 <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
-                <action android:name="android.intent.action.SCREEN_ON" />
+                <action android:name="android.intent.action.REBOOT" />
+                <action android:name="android.intent.action.USER_PRESENT" />
             </intent-filter>
             <intent-filter>
                 <action android:name="com.haier.emptyscreen.ACTION_LAUNCH_APP" />
+                <action android:name="com.haier.emptyscreen.ACTION_RETRY_LAUNCH" />
             </intent-filter>
         </receiver>
 

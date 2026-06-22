@@ -6,6 +6,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.ProgressBar;
@@ -49,6 +50,34 @@ public class LauncherActivity extends Activity {
         startForegroundService();
 
         checkMemoryAndContinue();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // 成功进入前台：标记本次开机拉起成功，使后续重试自动空转，并学习本机真实开机耗时
+        markBootLaunchSucceeded();
+    }
+
+    /**
+     * 标记开机拉起成功并更新自适应延迟
+     *
+     * <p>用"开机广播触发时刻"到"现在"的耗时，作为本机真实的开机进首页时间，
+     * 通过指数移动平均收敛 {@link PrefsManager} 中的自适应延迟，下次开机更精准。</p>
+     */
+    private void markBootLaunchSucceeded() {
+        if (mPrefsManager.isBootLaunchSuccess()) {
+            return;
+        }
+        mPrefsManager.setBootLaunchSuccess(true);
+
+        long bootElapsed = mPrefsManager.getLastBootElapsed();
+        if (bootElapsed > 0) {
+            long elapsedMillis = SystemClock.elapsedRealtime() - bootElapsed;
+            int elapsedSeconds = (int) (elapsedMillis / 1000L);
+            LogUtils.i(TAG + " Boot launch succeeded, elapsed=" + elapsedSeconds + "s since boot");
+            mPrefsManager.updateAdaptiveDelay(elapsedSeconds);
+        }
     }
 
     private void initializeViews() {

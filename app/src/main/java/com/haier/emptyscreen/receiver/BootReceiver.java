@@ -1,118 +1,90 @@
 package com.haier.emptyscreen.receiver;
 
-import android.app.AlarmManager;
-import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
-import android.os.SystemClock;
+import android.text.TextUtils;
 
-import com.haier.emptyscreen.LauncherActivity;
 import com.haier.emptyscreen.utils.LogUtils;
 import com.haier.emptyscreen.utils.PrefsManager;
 
 /**
- * 开机启动接收器 - 负责设备开机后延迟启动应用
+ * 开机启动接收器 - 监听多种开机/唤醒广播，触发自适应重试拉起
+ *
+ * <p>监听的广播来源分三类：</p>
+ * <ul>
+ *   <li>标准系统广播：BOOT_COMPLETED / LOCKED_BOOT_COMPLETED / QUICKBOOT_POWERON / REBOOT 等</li>
+ *   <li>厂商私有广播：海尔/海信等 ROM 自定义 action，通过 {@link PrefsManager} 可配置补充</li>
+ *   <li>内部重试广播：{@link BootLaunchScheduler#ACTION_RETRY_LAUNCH}</li>
+ * </ul>
+ *
+ * <p>真正的"延迟多久、重试几次"逻辑全部委托给 {@link BootLaunchScheduler}，
+ * 以适配不同厂商不同机型差异巨大的"开机进首页"时间。</p>
  */
 public class BootReceiver extends BroadcastReceiver {
 
-    private static final String ACTION_LAUNCH_APP = "com.haier.emptyscreen.ACTION_LAUNCH_APP";
+    private static final String TAG = "[BootReceiver]";
 
-    private static final int LAUNCH_REQUEST_CODE = 1001;
+    /** 内置识别的开机/唤醒类 action（标准 + 常见厂商快速开机）
+     *  注：SCREEN_ON/SCREEN_OFF 系统不允许静态注册，由 ForegroundService 动态注册处理 */
+    private static final String[] BUILTIN_BOOT_ACTIONS = {
+            Intent.ACTION_BOOT_COMPLETED,
+            "android.intent.action.LOCKED_BOOT_COMPLETED",
+            "android.intent.action.QUICKBOOT_POWERON",
+            "com.htc.intent.action.QUICKBOOT_POWERON",
+            "android.intent.action.REBOOT",
+            "android.intent.action.USER_PRESENT"
+    };
 
     @Override
     public void onReceive(Context context, Intent intent) {
         if (intent == null || intent.getAction() == null) {
-            LogUtils.w("[BootReceiver] Received null intent or action");
+            LogUtils.w(TAG + " Received null intent or action");
             return;
         }
 
         String action = intent.getAction();
-        LogUtils.i("[BootReceiver] Received broadcast: " + action);
-        if (Intent.ACTION_BOOT_COMPLETED.equals(action) ||
-                "android.intent.action.SCREEN_ON".equals(action) ||
-                "android.intent.action.QUICKBOOT_POWERON".equals(action) ||
-                "com.htc.intent.action.QUICKBOOT_POWERON".equals(action)) {
+        LogUtils.i(TAG + " Received broadcast: " + action);
 
-            scheduleAppLaunch(context);
-        } else if (ACTION_LAUNCH_APP.equals(action)) {
-            launchApp(context);
-        }
-    }
-
-    /**
-     * 调度应用启动（使用 AlarmManager 延迟启动）
-     */
-    private void scheduleAppLaunch(Context context) {
-        LogUtils.i("[BootReceiver] Scheduling app launch");
-
-        PrefsManager prefsManager = PrefsManager.getInstance(context);
-        int delaySeconds = prefsManager.getBootDelaySeconds();
-
-        LogUtils.i("[BootReceiver] Scheduling app launch after " + delaySeconds + " seconds");
-
-        AlarmManager alarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
-        if (alarmManager == null) {
-            LogUtils.e("[BootReceiver] AlarmManager is null, launching directly");
-            launchApp(context);
+        // 内部重试广播：交给调度器执行单次拉起
+        if (BootLaunchScheduler.ACTION_RETRY_LAUNCH.equals(action)) {
+            int retryIndex = intent.getIntExtra(BootLaunchScheduler.EXTRA_RETRY_INDEX, -1);
+            BootLaunchScheduler.handleRetry(context, retryIndex);
             return;
         }
 
-        Intent launchIntent = new Intent(context, BootReceiver.class);
-        launchIntent.setAction(ACTION_LAUNCH_APP);
-
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(
-                context,
-                LAUNCH_REQUEST_CODE,
-                launchIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-        );
-
-        long triggerAtMillis = SystemClock.elapsedRealtime() + (delaySeconds * 1000L);
-
-        try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                        AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                        triggerAtMillis,
-                        pendingIntent
-                );
-            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-                alarmManager.setExact(
-                        AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                        triggerAtMillis,
-                        pendingIntent
-                );
-            } else {
-                alarmManager.set(
-                        AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                        triggerAtMillis,
-                        pendingIntent
-                );
-            }
-            LogUtils.i("[BootReceiver] Alarm scheduled successfully for " + delaySeconds + " seconds later");
-        } catch (Exception e) {
-            LogUtils.e("[BootReceiver] Failed to schedule alarm: " + e.getMessage());
-            launchApp(context);
+        // 开机/唤醒类广播：启动整条自适应重试序列
+        if (isBootAction(context, action)) {
+            BootLaunchScheduler.onBootDetected(context);
         }
     }
 
     /**
-     * 启动应用
+     * 判断收到的 action 是否属于"开机/唤醒"类
+     *
+     * <p>先匹配内置列表，再匹配用户在 {@link PrefsManager} 配置的厂商私有 action，
+     * 这样无需改代码即可通过真机抓包补充新机型的私有广播。</p>
+     *
+     * @param context 上下文
+     * @param action  收到的广播 action
+     * @return true-属于开机/唤醒类
      */
-    private void launchApp(Context context) {
-        LogUtils.i("[BootReceiver] Launching app");
-
-        try {
-            Intent launchIntent = new Intent(context, LauncherActivity.class);
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK);
-            launchIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            context.startActivity(launchIntent);
-            LogUtils.i("[BootReceiver] App launched successfully");
-        } catch (Exception e) {
-            LogUtils.e("[BootReceiver] Failed to launch app: " + e.getMessage());
+    private boolean isBootAction(Context context, String action) {
+        for (String builtin : BUILTIN_BOOT_ACTIONS) {
+            if (builtin.equals(action)) {
+                return true;
+            }
         }
+
+        String custom = PrefsManager.getInstance(context).getCustomBootActions();
+        if (!TextUtils.isEmpty(custom)) {
+            for (String item : custom.split(",")) {
+                if (action.equals(item.trim())) {
+                    LogUtils.i(TAG + " Matched custom boot action: " + action);
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

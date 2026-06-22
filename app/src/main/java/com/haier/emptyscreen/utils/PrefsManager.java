@@ -48,12 +48,48 @@ public class PrefsManager {
     
     /** 内存清理间隔键（秒） */
     private static final String KEY_MEMORY_CLEAN_INTERVAL = "memory_clean_interval";
-    
+
+    /** 自适应开机延迟键（秒）- 通过学习收敛到本机最佳拉起时机 */
+    private static final String KEY_ADAPTIVE_DELAY = "adaptive_delay_seconds";
+
+    /** 开机拉起重试次数键 */
+    private static final String KEY_BOOT_RETRY_COUNT = "boot_retry_count";
+
+    /** 开机拉起重试间隔键（秒） */
+    private static final String KEY_BOOT_RETRY_INTERVAL = "boot_retry_interval";
+
+    /** 上次开机时间戳键（SystemClock.elapsedRealtime） */
+    private static final String KEY_LAST_BOOT_ELAPSED = "last_boot_elapsed";
+
+    /** 本次开机拉起成功标记键 */
+    private static final String KEY_BOOT_LAUNCH_SUCCESS = "boot_launch_success";
+
+    /** 厂商自定义开机广播 action 列表键（逗号分隔） */
+    private static final String KEY_CUSTOM_BOOT_ACTIONS = "custom_boot_actions";
+
     /** 默认 URL（内网测试地址） */
     private static final String DEFAULT_URL = "https://www.baidu.com";
-    
-    /** 默认开机延迟（10 秒） */
-    private static final int DEFAULT_BOOT_DELAY = 10;
+
+    /** 默认开机延迟（5 秒） */
+    private static final int DEFAULT_BOOT_DELAY = 5;
+
+    /** 默认自适应延迟初始值（秒）- 首次安装时的保守起点 */
+    private static final int DEFAULT_ADAPTIVE_DELAY = 10;
+
+    /** 默认开机拉起重试次数 */
+    private static final int DEFAULT_BOOT_RETRY_COUNT = 5;
+
+    /** 默认开机拉起重试间隔（秒） */
+    private static final int DEFAULT_BOOT_RETRY_INTERVAL = 6;
+
+    /** 自适应延迟下限（秒） */
+    private static final int MIN_ADAPTIVE_DELAY = 3;
+
+    /** 自适应延迟上限（秒） */
+    private static final int MAX_ADAPTIVE_DELAY = 60;
+
+    /** 自适应学习平滑系数（指数移动平均，新值权重） */
+    private static final float ADAPTIVE_ALPHA = 0.4f;
     
     /** 默认前台服务延迟（30 秒） */
     private static final int DEFAULT_FOREGROUND_DELAY = 30;
@@ -243,7 +279,135 @@ public class PrefsManager {
     public int getMemoryCleanInterval() {
         return mPrefs.getInt(KEY_MEMORY_CLEAN_INTERVAL, DEFAULT_MEMORY_CLEAN_INTERVAL);
     }
-    
+
+    // ==================== 开机自适应延迟相关 ====================
+
+    /**
+     * 获取自适应开机延迟时间（秒）
+     *
+     * <p>该值由历史开机记录学习得到，越用越接近本机真实的"开机进首页"耗时。</p>
+     *
+     * @return 自适应延迟秒数
+     */
+    public int getAdaptiveDelaySeconds() {
+        return mPrefs.getInt(KEY_ADAPTIVE_DELAY, DEFAULT_ADAPTIVE_DELAY);
+    }
+
+    /**
+     * 根据本次实际拉起耗时更新自适应延迟（指数移动平均）
+     *
+     * <p>新延迟 = α × 本次耗时 + (1-α) × 历史延迟，并裁剪到 [下限, 上限]。</p>
+     *
+     * @param actualElapsedSeconds 本次"开机广播 → 成功进前台"的实际耗时（秒）
+     */
+    public void updateAdaptiveDelay(int actualElapsedSeconds) {
+        if (actualElapsedSeconds <= 0) {
+            return;
+        }
+        int oldDelay = getAdaptiveDelaySeconds();
+        float smoothed = ADAPTIVE_ALPHA * actualElapsedSeconds + (1 - ADAPTIVE_ALPHA) * oldDelay;
+        int newDelay = Math.round(smoothed);
+        if (newDelay < MIN_ADAPTIVE_DELAY) {
+            newDelay = MIN_ADAPTIVE_DELAY;
+        } else if (newDelay > MAX_ADAPTIVE_DELAY) {
+            newDelay = MAX_ADAPTIVE_DELAY;
+        }
+        mPrefs.edit().putInt(KEY_ADAPTIVE_DELAY, newDelay).apply();
+        LogUtils.i("[PrefsManager] Adaptive delay updated: " + oldDelay + "s -> " + newDelay
+                + "s (actual=" + actualElapsedSeconds + "s)");
+    }
+
+    /**
+     * 获取开机拉起重试次数
+     *
+     * @return 重试次数
+     */
+    public int getBootRetryCount() {
+        return mPrefs.getInt(KEY_BOOT_RETRY_COUNT, DEFAULT_BOOT_RETRY_COUNT);
+    }
+
+    /**
+     * 保存开机拉起重试次数
+     *
+     * @param count 重试次数
+     */
+    public void saveBootRetryCount(int count) {
+        mPrefs.edit().putInt(KEY_BOOT_RETRY_COUNT, count).apply();
+    }
+
+    /**
+     * 获取开机拉起重试间隔（秒）
+     *
+     * @return 重试间隔秒数
+     */
+    public int getBootRetryInterval() {
+        return mPrefs.getInt(KEY_BOOT_RETRY_INTERVAL, DEFAULT_BOOT_RETRY_INTERVAL);
+    }
+
+    /**
+     * 保存开机拉起重试间隔（秒）
+     *
+     * @param seconds 重试间隔秒数
+     */
+    public void saveBootRetryInterval(int seconds) {
+        mPrefs.edit().putInt(KEY_BOOT_RETRY_INTERVAL, seconds).apply();
+    }
+
+    /**
+     * 记录开机广播触发时刻（SystemClock.elapsedRealtime 毫秒）
+     *
+     * @param elapsedMillis 开机基准时间
+     */
+    public void saveLastBootElapsed(long elapsedMillis) {
+        mPrefs.edit().putLong(KEY_LAST_BOOT_ELAPSED, elapsedMillis).apply();
+    }
+
+    /**
+     * 获取开机广播触发时刻
+     *
+     * @return 开机基准时间（毫秒），未记录返回 -1
+     */
+    public long getLastBootElapsed() {
+        return mPrefs.getLong(KEY_LAST_BOOT_ELAPSED, -1L);
+    }
+
+    /**
+     * 设置本次开机拉起是否已成功（成功后用于取消剩余重试）
+     *
+     * @param success true-已成功进前台
+     */
+    public void setBootLaunchSuccess(boolean success) {
+        mPrefs.edit().putBoolean(KEY_BOOT_LAUNCH_SUCCESS, success).apply();
+    }
+
+    /**
+     * 查询本次开机拉起是否已成功
+     *
+     * @return true-已成功
+     */
+    public boolean isBootLaunchSuccess() {
+        return mPrefs.getBoolean(KEY_BOOT_LAUNCH_SUCCESS, false);
+    }
+
+    /**
+     * 保存厂商自定义开机广播 action 列表
+     *
+     * @param actions action 集合（逗号分隔的字符串）
+     */
+    public void saveCustomBootActions(String actions) {
+        mPrefs.edit().putString(KEY_CUSTOM_BOOT_ACTIONS, actions == null ? "" : actions).apply();
+        LogUtils.i("[PrefsManager] Custom boot actions saved: " + actions);
+    }
+
+    /**
+     * 获取厂商自定义开机广播 action 列表
+     *
+     * @return 逗号分隔的 action 字符串，未设置返回空串
+     */
+    public String getCustomBootActions() {
+        return mPrefs.getString(KEY_CUSTOM_BOOT_ACTIONS, "");
+    }
+
     public void clearAll() {
         mPrefs.edit().clear().apply();
         LogUtils.i("[PrefsManager] All preferences cleared");
