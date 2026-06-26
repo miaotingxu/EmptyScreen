@@ -19,6 +19,7 @@ import android.widget.VideoView;
 
 import com.haier.emptyscreen.utils.LogUtils;
 import com.haier.emptyscreen.utils.MemoryCleaner;
+import com.haier.logger.HLogger;
 
 public class VideoPlayerActivity extends Activity {
 
@@ -56,7 +57,7 @@ public class VideoPlayerActivity extends Activity {
         parseIntentData();
 
         if (mVideoUri == null) {
-            LogUtils.e(TAG + " Video URI is null, finishing activity");
+            HLogger.e(TAG + " Video URI is null, finishing activity");
             finish();
             return;
         }
@@ -76,7 +77,7 @@ public class VideoPlayerActivity extends Activity {
             }
         }
 
-        LogUtils.d(TAG + " Video URI: " + mVideoUri + ", Is local: " + mIsLocalVideo);
+        HLogger.d(TAG + " Video URI: " + mVideoUri + ", Is local: " + mIsLocalVideo);
     }
 
     private void initializeViews() {

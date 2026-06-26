@@ -6,9 +6,15 @@ android {
     namespace 'com.haier.emptyscreen'
     compileSdk 34
 
+    // AGP 8.0+ 默认关闭 BuildConfig 生成，这里显式开启
+    // 用于 MainActivity 中按 BuildConfig.DEBUG 切换 WebView 远程调试开关
+    buildFeatures {
+        buildConfig true
+    }
+
     defaultConfig {
         applicationId "com.haier.emptyscreen"
-        minSdk 24
+        minSdk 21
         targetSdk 34
         versionCode 1
         versionName "1.0"
@@ -60,4 +66,5 @@ dependencies {
     implementation libs.material
     implementation libs.activity
     implementation libs.constraintlayout
+    implementation project(':hlogger')
 }

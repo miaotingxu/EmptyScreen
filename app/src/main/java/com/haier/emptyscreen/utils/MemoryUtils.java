@@ -5,6 +5,8 @@ import android.content.Context;
 import android.os.Debug;
 import android.os.Process;
 
+import com.haier.logger.HLogger;
+
 import java.text.DecimalFormat;
 
 /**
@@ -146,10 +148,10 @@ public class MemoryUtils {
      * @param context 上下文
      */
     public static void logMemoryInfo(Context context) {
-        LogUtils.d("[MemoryUtils] App Memory Usage: " + getMemoryUsagePercent(context));
-        LogUtils.d("[MemoryUtils] App Used Memory: " + formatSize(getUsedMemory(context)));
-        LogUtils.d("[MemoryUtils] Total Memory: " + formatSize(getTotalMemory(context)));
-        LogUtils.d("[MemoryUtils] Available Memory: " + formatSize(getAvailableMemory(context)));
-        LogUtils.d("[MemoryUtils] System Memory Usage: " + String.format("%.1f%%", getSystemMemoryUsagePercent(context)));
+        HLogger.d("[MemoryUtils] App Memory Usage: " + getMemoryUsagePercent(context));
+        HLogger.d("[MemoryUtils] App Used Memory: " + formatSize(getUsedMemory(context)));
+        HLogger.d("[MemoryUtils] Total Memory: " + formatSize(getTotalMemory(context)));
+        HLogger.d("[MemoryUtils] Available Memory: " + formatSize(getAvailableMemory(context)));
+        HLogger.d("[MemoryUtils] System Memory Usage: " + String.format("%.1f%%", getSystemMemoryUsagePercent(context)));
     }
 }

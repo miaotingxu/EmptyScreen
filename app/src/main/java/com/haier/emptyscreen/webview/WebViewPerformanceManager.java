@@ -4,7 +4,7 @@ import android.view.View;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
-import com.haier.emptyscreen.utils.LogUtils;
+import com.haier.logger.HLogger;
 
 /**
  * WebView 性能管理器 - 优化 WebView 性能和内存使用
@@ -25,11 +25,10 @@ public class WebViewPerformanceManager {
     public void optimizeWebViewPerformance() {
         enableHardwareAcceleration();
         configureCache();
-        configureDrawingCache();
         configureGeolocation();
         configureMediaPlayback();
-        
-        LogUtils.d(TAG + " WebView performance optimization completed");
+
+        HLogger.d(TAG, " WebView performance optimization completed");
     }
 
     /**
@@ -37,7 +36,7 @@ public class WebViewPerformanceManager {
      */
     private void enableHardwareAcceleration() {
         mWebView.setLayerType(View.LAYER_TYPE_HARDWARE, null);
-        LogUtils.d(TAG + " Hardware acceleration enabled");
+        HLogger.d(TAG, " Hardware acceleration enabled");
     }
 
     /**
@@ -45,19 +44,10 @@ public class WebViewPerformanceManager {
      */
     private void configureCache() {
         WebSettings settings = mWebView.getSettings();
-//        settings.setAppCacheEnabled(true);
         settings.setDatabaseEnabled(true);
         settings.setDomStorageEnabled(true);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
-        LogUtils.d(TAG + " Cache configured");
-    }
-
-    /**
-     * 配置绘图缓存
-     */
-    private void configureDrawingCache() {
-        mWebView.setDrawingCacheEnabled(false);
-        LogUtils.d(TAG + " Drawing cache disabled");
+        HLogger.d(TAG, " Cache configured");
     }
 
     /**
@@ -66,7 +56,7 @@ public class WebViewPerformanceManager {
     private void configureGeolocation() {
         WebSettings settings = mWebView.getSettings();
         settings.setGeolocationEnabled(true);
-        LogUtils.d(TAG + " Geolocation enabled");
+        HLogger.d(TAG, " Geolocation enabled");
     }
 
     /**
@@ -75,7 +65,7 @@ public class WebViewPerformanceManager {
     private void configureMediaPlayback() {
         WebSettings settings = mWebView.getSettings();
         settings.setMediaPlaybackRequiresUserGesture(false);
-        LogUtils.d(TAG + " Media playback configured for background play");
+        HLogger.d(TAG, " Media playback configured for background play");
     }
 
     /**
@@ -85,7 +75,7 @@ public class WebViewPerformanceManager {
         if (mWebView != null) {
             mWebView.destroy();
             mWebView = null;
-            LogUtils.d(TAG + " WebView resources released");
+            HLogger.d(TAG, " WebView resources released");
         }
     }
 }

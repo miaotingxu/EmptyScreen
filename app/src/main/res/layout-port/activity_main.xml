@@ -85,4 +85,12 @@
             android:textSize="14sp" />
     </LinearLayout>
 
+    <!-- HTML5 video 全屏容器：CustomWebChromeClient.onShowCustomView 时承载全屏视图 -->
+    <FrameLayout
+        android:id="@+id/video_container"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#000000"
+        android:visibility="gone" />
+
 </FrameLayout>

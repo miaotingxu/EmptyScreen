@@ -9,3 +9,12 @@
 .cxx
 local.properties
 .vscode
+.claude
+# 签名密钥文件 - 绝不应提交到仓库
+*.jks
+*.keystore
+
+# 构建产物与历史重写临时文件
+compile_log.txt
+.git-rewrite/
+.secret-clean.sh

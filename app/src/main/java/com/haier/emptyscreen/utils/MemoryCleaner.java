@@ -8,6 +8,8 @@ import android.os.Process;
 import android.webkit.CookieManager;
 import android.webkit.WebView;
 
+import com.haier.logger.HLogger;
+
 import java.io.File;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -73,7 +75,7 @@ public class MemoryCleaner {
      * @return 清理结果
      */
     public static CleanResult cleanMemory(Context context) {
-        LogUtils.i(TAG + " Starting memory cleanup...");
+        HLogger.i(TAG + " Starting memory cleanup...");
 
         float beforePercent = MemoryUtils.getSystemMemoryUsagePercent(context);
         long beforeUsed = MemoryUtils.getUsedMemory(context);
@@ -102,7 +104,7 @@ public class MemoryCleaner {
         CleanLog log = new CleanLog(timestamp, beforePercent, afterPercent, freedBytes, itemsStr);
         addCleanLog(log);
 
-        LogUtils.i(TAG + " Memory cleanup completed. Before: " + String.format("%.1f%%", beforePercent) +
+        HLogger.i(TAG + " Memory cleanup completed. Before: " + String.format("%.1f%%", beforePercent) +
                 ", After: " + String.format("%.1f%%", afterPercent) +
                 ", Freed: " + MemoryUtils.formatSize(freedBytes) +
                 ", Items: " + itemsStr);
@@ -123,7 +125,7 @@ public class MemoryCleaner {
                 long freed = beforeSize - afterSize;
                 if (freed > 0) {
                     cleanedItems.append("AppCache(").append(MemoryUtils.formatSize(freed)).append("), ");
-                    LogUtils.d(TAG + " Cleaned app cache: " + MemoryUtils.formatSize(freed));
+                    HLogger.d(TAG + " Cleaned app cache: " + MemoryUtils.formatSize(freed));
                 }
             }
 
@@ -135,11 +137,11 @@ public class MemoryCleaner {
                 long freed = beforeSize - afterSize;
                 if (freed > 0) {
                     cleanedItems.append("ExternalCache(").append(MemoryUtils.formatSize(freed)).append("), ");
-                    LogUtils.d(TAG + " Cleaned external cache: " + MemoryUtils.formatSize(freed));
+                    HLogger.d(TAG + " Cleaned external cache: " + MemoryUtils.formatSize(freed));
                 }
             }
         } catch (Exception e) {
-            LogUtils.e(TAG + " Failed to clean app cache: " + e.getMessage());
+            HLogger.e(TAG + " Failed to clean app cache: " + e.getMessage());
         }
     }
 
@@ -150,7 +152,7 @@ public class MemoryCleaner {
         try {
             Context context = LogUtils.getApplicationContext();
             if (context == null) {
-                LogUtils.w(TAG + " Cannot clean WebView cache: context is null");
+                HLogger.w(TAG + " Cannot clean WebView cache: context is null");
                 return;
             }
             
@@ -167,10 +169,10 @@ public class MemoryCleaner {
             long freed = beforeMemory - afterMemory;
             if (freed > 0) {
                 cleanedItems.append("WebView(").append(MemoryUtils.formatSize(freed)).append("), ");
-                LogUtils.d(TAG + " Cleaned WebView cache: " + MemoryUtils.formatSize(freed));
+                HLogger.d(TAG + " Cleaned WebView cache: " + MemoryUtils.formatSize(freed));
             }
         } catch (Exception e) {
-            LogUtils.e(TAG + " Failed to clean WebView cache: " + e.getMessage());
+            HLogger.e(TAG + " Failed to clean WebView cache: " + e.getMessage());
         }
     }
 
@@ -188,7 +190,7 @@ public class MemoryCleaner {
                 Thread.sleep(100);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                LogUtils.w(TAG + " Dalvik GC interrupted");
+                HLogger.w(TAG + " Dalvik GC interrupted");
                 return;
             }
 
@@ -196,10 +198,10 @@ public class MemoryCleaner {
             long freed = beforeMemory - afterMemory;
             if (freed > 0) {
                 cleanedItems.append("GC(").append(MemoryUtils.formatSize(freed)).append("), ");
-                LogUtils.d(TAG + " Dalvik GC freed: " + MemoryUtils.formatSize(freed));
+                HLogger.d(TAG + " Dalvik GC freed: " + MemoryUtils.formatSize(freed));
             }
         } catch (Exception e) {
-            LogUtils.e(TAG + " Failed to clean Dalvik cache: " + e.getMessage());
+            HLogger.e(TAG + " Failed to clean Dalvik cache: " + e.getMessage());
         }
     }
 
@@ -218,17 +220,17 @@ public class MemoryCleaner {
                 Thread.sleep(50);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                LogUtils.w(TAG + " Runtime GC interrupted");
+                HLogger.w(TAG + " Runtime GC interrupted");
                 return;
             }
 
             long afterFree = runtime.freeMemory();
             long freed = afterFree - beforeFree;
             if (freed > 0) {
-                LogUtils.d(TAG + " Runtime GC freed: " + MemoryUtils.formatSize(freed));
+                HLogger.d(TAG + " Runtime GC freed: " + MemoryUtils.formatSize(freed));
             }
         } catch (Exception e) {
-            LogUtils.e(TAG + " Failed to trigger GC: " + e.getMessage());
+            HLogger.e(TAG + " Failed to trigger GC: " + e.getMessage());
         }
     }
 
@@ -314,7 +316,7 @@ public class MemoryCleaner {
         boolean shouldClean = currentPercent >= thresholdPercent;
 
         if (shouldClean) {
-            LogUtils.i(TAG + " Memory usage " + String.format("%.1f%%", currentPercent) +
+            HLogger.i(TAG + " Memory usage " + String.format("%.1f%%", currentPercent) +
                     " >= threshold " + thresholdPercent + "%, cleanup needed");
         }
 

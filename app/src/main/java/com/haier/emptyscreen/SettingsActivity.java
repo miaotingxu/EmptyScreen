@@ -13,10 +13,10 @@ import android.widget.Toast;
 
 import androidx.appcompat.widget.SwitchCompat;
 
-import com.haier.emptyscreen.utils.LogUtils;
 import com.haier.emptyscreen.utils.MemoryCleaner;
 import com.haier.emptyscreen.utils.NetworkUtils;
 import com.haier.emptyscreen.utils.PrefsManager;
+import com.haier.logger.HLogger;
 
 public class SettingsActivity extends Activity {
 
@@ -29,6 +29,7 @@ public class SettingsActivity extends Activity {
     private Button mSaveButton;
     private Button mSaveTimeSettingsButton;
     private Button mCleanNowButton;
+    private Button mClearBrowserCacheButton;
     private ImageButton mSystemSettingsButton;
     private ImageButton mBackButton;
 
@@ -71,6 +72,7 @@ public class SettingsActivity extends Activity {
         mSaveButton = findViewById(R.id.btn_save);
         mSaveTimeSettingsButton = findViewById(R.id.btn_save_time_settings);
         mCleanNowButton = findViewById(R.id.btn_clean_now);
+        mClearBrowserCacheButton = findViewById(R.id.btn_clear_browser_cache);
         mSystemSettingsButton = findViewById(R.id.btn_system_settings);
         mBackButton = findViewById(R.id.btn_back);
 
@@ -123,13 +125,66 @@ public class SettingsActivity extends Activity {
         mSaveButton.setOnClickListener(v -> saveUrlSettings());
         mSaveTimeSettingsButton.setOnClickListener(v -> saveTimeSettings());
         mCleanNowButton.setOnClickListener(v -> cleanMemory());
+        mClearBrowserCacheButton.setOnClickListener(v -> confirmClearBrowserCache());
         mSystemSettingsButton.setOnClickListener(v -> openSystemSettings());
         mBackButton.setOnClickListener(v -> finish());
 
         mMemoryCleanEnabledSwitch.setOnCheckedChangeListener((buttonView, isChecked) -> {
             mPrefsManager.saveMemoryCleanEnabled(isChecked);
-            LogUtils.i(TAG + " Memory clean enabled: " + isChecked);
+            HLogger.i(TAG + " Memory clean enabled: " + isChecked);
         });
+    }
+
+    private void confirmClearBrowserCache() {
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(getString(R.string.clear_browser_cache))
+                .setMessage(getString(R.string.cache_clear_confirm))
+                .setPositiveButton(getString(R.string.clear_browser_cache), (dialog, which) -> {
+                    clearBrowserCache();
+                })
+                .setNegativeButton(getString(R.string.cancel), null)
+                .show();
+    }
+
+    private void clearBrowserCache() {
+        Toast.makeText(this, getString(R.string.clearing_cache), Toast.LENGTH_SHORT).show();
+
+        new Thread(() -> {
+            try {
+                android.webkit.CookieManager cookieManager = android.webkit.CookieManager.getInstance();
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                    cookieManager.removeAllCookies(null);
+                } else {
+                    cookieManager.removeAllCookie();
+                }
+
+                android.webkit.WebStorage.getInstance().deleteAllData();
+
+                runOnUiThread(() -> {
+                    try {
+                        android.webkit.WebView webView = new android.webkit.WebView(SettingsActivity.this);
+                        webView.clearCache(true);
+                        webView.clearFormData();
+                        webView.clearHistory();
+                        webView.destroy();
+
+                        Toast.makeText(SettingsActivity.this, getString(R.string.cache_clear_success), Toast.LENGTH_LONG).show();
+                        HLogger.i(TAG + " Browser cache cleared successfully");
+
+                        setResult(RESULT_OK);
+                        finish();
+                    } catch (Exception e) {
+                        Toast.makeText(SettingsActivity.this, getString(R.string.cache_clear_failed), Toast.LENGTH_SHORT).show();
+                        HLogger.e(TAG + " Failed to clear browser cache: " + e.getMessage());
+                    }
+                });
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    Toast.makeText(SettingsActivity.this, getString(R.string.cache_clear_failed), Toast.LENGTH_SHORT).show();
+                    HLogger.e(TAG + " Failed to clear browser cache: " + e.getMessage());
+                });
+            }
+        }).start();
     }
 
     private void saveUrlSettings() {
@@ -142,7 +197,7 @@ public class SettingsActivity extends Activity {
         mUrlErrorText.setVisibility(View.GONE);
         mPrefsManager.saveUrl(url);
         Toast.makeText(this, "URL已保存", Toast.LENGTH_SHORT).show();
-        LogUtils.i(TAG + " URL saved: " + url);
+        HLogger.i(TAG + " URL saved: " + url);
     }
 
     private void saveTimeSettings() {
@@ -158,20 +213,22 @@ public class SettingsActivity extends Activity {
             mPrefsManager.saveMemoryCleanThreshold(threshold);
 
             Toast.makeText(this, "时间设置已保存", Toast.LENGTH_SHORT).show();
-            LogUtils.i(TAG + " Time settings saved");
+            HLogger.i(TAG + " Time settings saved");
         } catch (NumberFormatException e) {
             Toast.makeText(this, "请输入有效的数字", Toast.LENGTH_SHORT).show();
-            LogUtils.e(TAG + " Failed to save time settings: " + e.getMessage());
+            HLogger.e(TAG + " Failed to save time settings: " + e.getMessage());
         }
     }
 
     private void updateNetworkInfo() {
         if (NetworkUtils.isNetworkAvailable(this)) {
             mNetworkStatusText.setText("已连接");
-            mNetworkStatusText.setTextColor(getColor(R.color.green_500));
+            mNetworkStatusText.setTextColor(
+                    androidx.core.content.ContextCompat.getColor(this, R.color.green_500));
         } else {
             mNetworkStatusText.setText("未连接");
-            mNetworkStatusText.setTextColor(getColor(R.color.red_500));
+            mNetworkStatusText.setTextColor(
+                    androidx.core.content.ContextCompat.getColor(this, R.color.red_500));
         }
 
         mNetworkTypeText.setText(NetworkUtils.getNetworkType(this));
@@ -212,7 +269,7 @@ public class SettingsActivity extends Activity {
                 mCleanLogText.setText("最近清理: " + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.getDefault()).format(new java.util.Date()));
                 mCleanLogText.setVisibility(View.VISIBLE);
                 updateMemoryInfo();
-                LogUtils.i(TAG + " Manual memory cleanup completed: " + result.freedBytes + " bytes freed");
+                HLogger.i(TAG + " Manual memory cleanup completed: " + result.freedBytes + " bytes freed");
             });
         }).start();
     }
@@ -222,10 +279,10 @@ public class SettingsActivity extends Activity {
             Intent intent = new Intent(android.provider.Settings.ACTION_SETTINGS);
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             startActivity(intent);
-            LogUtils.d(TAG + " Opened system settings");
+            HLogger.d(TAG + " Opened system settings");
         } catch (Exception e) {
             Toast.makeText(this, "无法打开系统设置", Toast.LENGTH_SHORT).show();
-            LogUtils.e(TAG + " Failed to open system settings: " + e.getMessage());
+            HLogger.e(TAG + " Failed to open system settings: " + e.getMessage());
         }
     }
 

@@ -4,6 +4,7 @@
     <string name="settings">设置</string>
     <string name="system_settings">系统设置</string>
     <string name="back">返回</string>
+    <string name="cancel">取消</string>
     <string name="network_info">网络信息</string>
     <string name="network_status">网络状态</string>
     <string name="network_type">网络类型</string>
@@ -73,4 +74,11 @@
     <string name="launcher_subtitle">智能电视全屏展示</string>
     <string name="memory_optimizing">内存优化中...</string>
     <string name="memory_warning">内存占用过高，正在优化</string>
+
+    <string name="browser_cache_settings">浏览器缓存设置</string>
+    <string name="clear_browser_cache">清除浏览器缓存</string>
+    <string name="clearing_cache">正在清除缓存...</string>
+    <string name="cache_clear_success">缓存清除成功，页面将重新加载</string>
+    <string name="cache_clear_failed">缓存清除失败</string>
+    <string name="cache_clear_confirm">确定要清除浏览器缓存吗？这将删除所有已保存的网页数据、Cookie和登录信息。</string>
 </resources>

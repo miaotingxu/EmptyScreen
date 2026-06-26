@@ -11,6 +11,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
@@ -27,7 +28,7 @@ import com.haier.emptyscreen.R;
 import com.haier.emptyscreen.SettingsActivity;
 import com.haier.emptyscreen.VideoPlayerActivity;
 import com.haier.emptyscreen.receiver.BootLaunchScheduler;
-import com.haier.emptyscreen.utils.LogUtils;
+import com.haier.logger.HLogger;
 import com.haier.emptyscreen.utils.MemoryUtils;
 import com.haier.emptyscreen.utils.PrefsManager;
 
@@ -44,6 +45,14 @@ public class ForegroundService extends Service {
 
     /** 判定为 STR 真睡眠的最小挂起时长（毫秒）- 两时钟差值超过此值才认为 CPU 真的挂起过 */
     private static final long STR_SUSPEND_THRESHOLD_MS = 3_000L;
+
+    /**
+     * 服务是否存活的静态标志
+     *
+     * <p>供 {@link #ensureRunning(Context)} 快速判断是否需要重启服务。
+     * 进程被杀时静态变量随进程一起消失（自动重置为 false），不会误报存活。</p>
+     */
+    private static volatile boolean sIsRunning = false;
 
     private Handler mHandler;
     private Runnable mMemoryCheckRunnable;
@@ -64,7 +73,7 @@ public class ForegroundService extends Service {
     private long mScreenOffUptimeMs = -1L;
 
     private int mResumedTargetActivityCount = 0;
-    private boolean mIsAppInForeground = true;
+    private boolean mIsAppInForeground = false;
     private boolean mIsBringToFrontScheduled = false;
 
     /**
@@ -80,12 +89,18 @@ public class ForegroundService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
+        sIsRunning = true;
 
         mPrefsManager = PrefsManager.getInstance(this);
         mHandler = new Handler(Looper.getMainLooper());
 
+        // 真实探测当前前台状态，而非默认 true。
+        // 服务被系统重启拉起（START_STICKY）时应用可能并不在前台，默认 true 会导致
+        // 首次 SCREEN_ON 被误判为"应用已在前台"而忽略 STR 唤醒。
+        mIsAppInForeground = BootLaunchScheduler.isOurAppForeground(this);
+
         createNotificationChannel();
-        startForeground(NOTIFICATION_ID, createNotification());
+        startForegroundSafely();
 
         setupLifecycleCallbacks();
 
@@ -95,7 +110,7 @@ public class ForegroundService extends Service {
             setupMemoryCheck();
         }
 
-        LogUtils.i("[ForegroundService] Started (event-driven mode)");
+        HLogger.i("[ForegroundService] Started (event-driven mode)");
     }
 
     /**
@@ -127,8 +142,14 @@ public class ForegroundService extends Service {
         IntentFilter filter = new IntentFilter();
         filter.addAction(Intent.ACTION_SCREEN_ON);
         filter.addAction(Intent.ACTION_SCREEN_OFF);
-        registerReceiver(mScreenReceiver, filter);
-        LogUtils.i("[ForegroundService] Screen receiver registered");
+        // Android 14（targetSdk 34）起动态注册广播必须显式声明导出状态，否则抛异常导致服务崩溃。
+        // SCREEN_ON/OFF 是系统广播，仅本应用接收，用 NOT_EXPORTED。
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(mScreenReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(mScreenReceiver, filter);
+        }
+        HLogger.i("[ForegroundService] Screen receiver registered");
     }
 
     /**
@@ -145,26 +166,31 @@ public class ForegroundService extends Service {
      */
     private void handleScreenOn(Context context) {
         if (mIsAppInForeground) {
-            LogUtils.i("[ForegroundService] SCREEN_ON ignored (app already foreground)");
+            HLogger.i("[ForegroundService] SCREEN_ON ignored (app already foreground)");
             return;
         }
 
-        // 区分纯亮屏与 STR 待机唤醒
-        if (!isWokenFromSuspend()) {
-            LogUtils.i("[ForegroundService] SCREEN_ON ignored (screen-on only, no CPU suspend)");
+        // 区分纯亮屏与 STR 待机唤醒：suspendedMs<0 表示无基准（保守判 STR）
+        long suspendedMs = computeSuspendedMs();
+        boolean strWake = (suspendedMs < 0) || (suspendedMs >= STR_SUSPEND_THRESHOLD_MS);
+        if (!strWake) {
+            HLogger.i("[ForegroundService] SCREEN_ON ignored (screen-on only, no CPU suspend, suspendedMs="
+                    + suspendedMs + ")");
             return;
         }
 
         long now = SystemClock.elapsedRealtime();
         if (now - mLastScreenOnHandledMs < SCREEN_ON_THROTTLE_MS) {
-            LogUtils.i("[ForegroundService] SCREEN_ON throttled ("
+            HLogger.i("[ForegroundService] SCREEN_ON throttled ("
                     + (now - mLastScreenOnHandledMs) + "ms since last)");
             return;
         }
         mLastScreenOnHandledMs = now;
 
-        LogUtils.i("[ForegroundService] SCREEN_ON accepted (STR wake) -> schedule launch");
-        BootLaunchScheduler.onBootDetected(context);
+        HLogger.i("[ForegroundService] SCREEN_ON accepted (STR wake, suspendedMs=" + suspendedMs
+                + ") -> schedule launch");
+        BootLaunchScheduler.onBootDetected(
+                context, BootLaunchScheduler.LaunchSource.STR_WAKE, suspendedMs);
     }
 
     /**
@@ -173,23 +199,23 @@ public class ForegroundService extends Service {
     private void handleScreenOff() {
         mScreenOffElapsedMs = SystemClock.elapsedRealtime();
         mScreenOffUptimeMs = SystemClock.uptimeMillis();
-        LogUtils.i("[ForegroundService] SCREEN_OFF received (standby), baseline recorded");
+        HLogger.i("[ForegroundService] SCREEN_OFF received (standby), baseline recorded");
     }
 
     /**
-     * 判断本次亮屏是否由 STR 待机唤醒（CPU 真正挂起过）
+     * 计算本次亮屏前 CPU 被挂起的时长（毫秒），用于判定是否 STR 待机唤醒并记录睡眠时长
      *
      * <p>原理：{@code elapsedRealtime} 含挂起时间，{@code uptimeMillis} 在挂起时冻结。
      * 熄屏到亮屏期间，两者增量之差 ≈ CPU 被挂起的时长。</p>
      *
-     * <p>若未记录到熄屏基准（如服务在熄屏后才启动），保守返回 true，宁可多拉一次也不漏。</p>
+     * <p>若未记录到熄屏基准（如服务在熄屏后才启动），返回 -1，调用方保守按 STR 处理。</p>
      *
-     * @return true-STR 唤醒或无法判定；false-仅亮屏未挂起
+     * @return 挂起时长（毫秒）；-1 表示无基准、无法判定
      */
-    private boolean isWokenFromSuspend() {
+    private long computeSuspendedMs() {
         if (mScreenOffElapsedMs < 0 || mScreenOffUptimeMs < 0) {
-            LogUtils.i("[ForegroundService] No screen-off baseline, assume STR wake");
-            return true;
+            HLogger.i("[ForegroundService] No screen-off baseline, assume STR wake");
+            return -1L;
         }
         long elapsedDelta = SystemClock.elapsedRealtime() - mScreenOffElapsedMs;
         long uptimeDelta = SystemClock.uptimeMillis() - mScreenOffUptimeMs;
@@ -199,9 +225,9 @@ public class ForegroundService extends Service {
         mScreenOffElapsedMs = -1L;
         mScreenOffUptimeMs = -1L;
 
-        LogUtils.i("[ForegroundService] suspendedMs=" + suspendedMs
+        HLogger.i("[ForegroundService] suspendedMs=" + suspendedMs
                 + " (elapsedDelta=" + elapsedDelta + ", uptimeDelta=" + uptimeDelta + ")");
-        return suspendedMs >= STR_SUSPEND_THRESHOLD_MS;
+        return suspendedMs;
     }
 
     /**
@@ -223,7 +249,7 @@ public class ForegroundService extends Service {
                     if (!mIsAppInForeground) {
                         mIsAppInForeground = true;
                         cancelBringToFrontTask();
-                        LogUtils.i("[ForegroundService] " + activity.getClass().getSimpleName() + 
+                        HLogger.i("[ForegroundService] " + activity.getClass().getSimpleName() +
                                 " resumed -> foreground (count=" + mResumedTargetActivityCount + ")");
                     }
                 }
@@ -238,7 +264,7 @@ public class ForegroundService extends Service {
                         mResumedTargetActivityCount = 0;
                         mIsAppInForeground = false;
                         scheduleBringToFrontTask();
-                        LogUtils.i("[ForegroundService] " + activity.getClass().getSimpleName() + 
+                        HLogger.i("[ForegroundService] " + activity.getClass().getSimpleName() +
                                 " paused -> background, will bring to front in " + 
                                 mPrefsManager.getForegroundDelaySeconds() + "s");
                     }
@@ -272,7 +298,7 @@ public class ForegroundService extends Service {
             if (!mIsAppInForeground) {
                 bringAppToFront();
                 mIsAppInForeground = true;
-                LogUtils.i("[ForegroundService] Brought app to front after delay");
+                HLogger.i("[ForegroundService] Brought app to front after delay");
             }
             mIsBringToFrontScheduled = false;
         };
@@ -293,7 +319,19 @@ public class ForegroundService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        // 记录服务存活轨迹：开机拉起依赖本服务持续存活（动态注册的 SCREEN_ON 接收器在此进程内）。
+        // flags 含 START_FLAG_REDELIVERY/START_FLAG_RETRY 可判断是否系统重启拉起。
+        HLogger.i("[ForegroundService] onStartCommand action="
+                + (intent == null ? "null(restart)" : intent.getAction())
+                + ", flags=" + flags + ", startId=" + startId);
         return START_STICKY;
+    }
+
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        // 用户/系统移除任务栈时回调。电视 ROM 常借此杀进程，记录便于关联"服务消失"与"STR唤醒拉不起"
+        HLogger.w("[ForegroundService] onTaskRemoved - task swiped/removed, service may be killed");
+        super.onTaskRemoved(rootIntent);
     }
 
     @Override
@@ -318,12 +356,67 @@ public class ForegroundService extends Service {
             try {
                 unregisterReceiver(mScreenReceiver);
             } catch (Exception e) {
-                LogUtils.w("[ForegroundService] unregister screen receiver failed: " + e.getMessage());
+                HLogger.w("[ForegroundService] unregister screen receiver failed: " + e.getMessage());
             }
             mScreenReceiver = null;
         }
-        LogUtils.i("[ForegroundService] Destroyed");
+        sIsRunning = false;
+        HLogger.i("[ForegroundService] Destroyed");
         super.onDestroy();
+    }
+
+    /**
+     * 确保常驻前台服务正在运行，否则启动它
+     *
+     * <p>STR 唤醒依赖 ForegroundService 动态注册的 SCREEN_ON 接收器。电视 ROM 在
+     * onTaskRemoved 或低内存下会杀掉服务，导致接收器消失、STR 唤醒失效。
+     * 在 Activity onResume 时调用本方法可让服务"自愈"——若已被杀则重新拉起，
+     * 若仍在运行则空转无副作用（startService 对已运行服务只触发 onStartCommand）。</p>
+     *
+     * @param context 任意上下文
+     */
+    public static void ensureRunning(Context context) {
+        if (sIsRunning) {
+            return;
+        }
+        try {
+            Intent serviceIntent = new Intent(context, ForegroundService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent);
+            } else {
+                context.startService(serviceIntent);
+            }
+            HLogger.i("[ForegroundService] ensureRunning: service was not running, start requested");
+        } catch (Exception e) {
+            HLogger.e("[ForegroundService] ensureRunning failed: "
+                    + e.getClass().getSimpleName() + " - " + e.getMessage());
+        }
+    }
+
+    /**
+     * 安全启动前台服务
+     *
+     * <p>Android 14 (API 34) 起 {@code startForeground} 会校验类型与 manifest 声明一致，
+     * 不匹配或权限缺失会抛 {@code ForegroundServiceTypeNotAllowed}，导致服务崩溃，
+     * 进而 SCREEN_ON 接收器无法注册，STR 唤醒彻底失效。</p>
+     *
+     * <p>API 34+ 调用三参重载显式传入 {@link ServiceInfo#FOREGROUND_SERVICE_TYPE_SPECIAL_USE}，
+     * 低版本回退到两参重载由 manifest 决定。失败时记录日志但继续执行后续初始化
+     * （registerScreenReceiver 等），尽量保住 STR 唤醒能力。</p>
+     */
+    private void startForegroundSafely() {
+        try {
+            Notification notification = createNotification();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                startForeground(NOTIFICATION_ID, notification,
+                        ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+            } else {
+                startForeground(NOTIFICATION_ID, notification);
+            }
+        } catch (Exception e) {
+            HLogger.e("[ForegroundService] startForeground failed: "
+                    + e.getClass().getSimpleName() + " - " + e.getMessage());
+        }
     }
 
     /**
@@ -393,7 +486,7 @@ public class ForegroundService extends Service {
         float currentUsage = MemoryUtils.getSystemMemoryUsagePercent(this);
 
         if (currentUsage >= threshold) {
-            LogUtils.w("[ForegroundService] Memory " + String.format("%.1f%%", currentUsage) + 
+            HLogger.w("[ForegroundService] Memory " + String.format("%.1f%%", currentUsage) +
                     " >= " + threshold + "%, restarting app");
             EmptyScreenApplication.getInstance().restartApp();
         }
@@ -410,7 +503,7 @@ public class ForegroundService extends Service {
                 bringAppToFrontDirectly();
             }
         } catch (Exception e) {
-            LogUtils.e("[ForegroundService] Bring to front failed: " + e.getMessage());
+            HLogger.e("[ForegroundService] Bring to front failed: " + e.getMessage());
         }
     }
 
@@ -460,7 +553,7 @@ public class ForegroundService extends Service {
         try {
             startActivity(intent);
         } catch (Exception e) {
-            LogUtils.w("[ForegroundService] Direct start failed: " + e.getMessage());
+            HLogger.w("[ForegroundService] Direct start failed: " + e.getMessage());
         }
     }
 }

@@ -1,0 +1,52 @@
+plugins {
+    id 'com.android.library'
+}
+
+ext.artifactId = 'hlogger'
+
+android {
+    namespace 'com.haier.logger'
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 21
+        targetSdk 34
+        versionCode 1
+        versionName "1.0.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        consumerProguardFiles "consumer-rules.pro"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    libraryVariants.all { variant ->
+        variant.outputs.all { output ->
+            outputFileName = "${artifactId}-${android.defaultConfig.versionName}-${variant.buildType.name}.aar"
+        }
+    }
+}
+
+dependencies {
+    implementation 'org.eclipse.paho:org.eclipse.paho.client.mqttv3:1.2.5'
+    implementation 'org.eclipse.paho:org.eclipse.paho.android.service:1.1.1'
+    implementation('com.qcloud.cos:cos-android:5.9.34') {
+        exclude group: 'com.squareup.okhttp3', module: 'okhttp'
+    }
+    implementation 'com.iqiyi.xcrash:xcrash-android-lib:3.1.0'
+    // 必须用 implementation 打进 APK：COS SDK 运行时依赖 okhttp（EventListener$Factory 等）。
+    // 之前用 compileOnly 只在编译期可见、不入包，导致运行时 NoClassDefFoundError 崩溃。
+    implementation 'com.squareup.okhttp3:okhttp:4.11.0'
+
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.json:json:20231013'
+}

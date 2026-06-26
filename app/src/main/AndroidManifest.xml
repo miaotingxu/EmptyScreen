@@ -9,12 +9,22 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- 精确闹钟：开机拉起依赖 AlarmManager.setExactAndAllowWhileIdle 排定重试序列。
+         Android 12+ 不声明会抛 SecurityException 导致整条重试序列排不上。
+         USE_EXACT_ALARM 适用于闹钟/唤醒为核心功能的应用，开机即授予、无需运行时申请。 -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+    <!-- 后台启动 Activity 豁免：Android 10+ 默认拦截后台 startActivity（静默失败）。
+         持有悬浮窗权限的应用可豁免，保证开机/STR 唤醒时能从后台拉起界面。 -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28" />
+        android:maxSdkVersion="32" />
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
@@ -108,7 +118,14 @@
             android:name=".service.ForegroundService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="mediaPlayback" />
+            android:foregroundServiceType="specialUse">
+            <!-- Android 14 (API 34) 强制要求 specialUse 类型声明具体子用途，
+                 否则 startForeground 会抛 ForegroundServiceTypeNotAllowed。
+                 本服务实际职责：屏幕状态监听（STR 唤醒）、应用生命周期监控（后台拉起）、内存监控。 -->
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="TV launcher keep-alive: screen-state monitoring for STR wake, app lifecycle monitoring for bring-to-front, memory monitoring" />
+        </service>
 
         <receiver
             android:name=".receiver.BootReceiver"
