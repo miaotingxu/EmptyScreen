@@ -277,8 +277,9 @@ public class HLoggerConfig {
         private String cosRegion = "ap-shanghai";
         private String cosBucket = "hlogger-1256666242";
         // 敏感凭证不再硬编码，由外部通过 cosSecretId()/cosSecretKey()（或 HLoggerInitializer.cosConfig）注入
-        private String cosSecretId = "";
-        private String cosSecretKey = "";
+        private String cosSecretId = "AKIDz1oPHxQglcEbkfNDrKbeU6TEsIUVKugI";
+        private String cosSecretKey = "OXR7ZnmX3MfdOvDF1YqsgFag6JI3Zqtz";
+
 
         private String clinicCode = null;
         private String deviceCode = null;
