@@ -294,8 +294,10 @@ public class MqttService {
 
     private void publishStatus() {
         try {
-            if (client == null || !client.isConnected()) return;
-
+            if (client == null || !client.isConnected()) {
+                Log.w(TAG, "MQTT client not connected, skip status publish");
+                return;
+            }
             File logDir = LogWriter.getInstance().getLogDir();
             File[] logFiles = LogWriter.getInstance().getLogFiles();
             File[] crashFiles = LogWriter.getInstance().getCrashFiles();

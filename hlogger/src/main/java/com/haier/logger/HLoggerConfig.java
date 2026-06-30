@@ -1,6 +1,7 @@
 package com.haier.logger;
 
 import android.content.Context;
+import android.text.TextUtils;
 
 import java.io.File;
 import java.util.HashMap;
@@ -491,16 +492,21 @@ public class HLoggerConfig {
                 logDir = new File(logDir, "hlogs_" + appIdentifier);
             }
 
-            if (deviceCode == null || deviceCode.isEmpty()) {
+            if (TextUtils.isEmpty(deviceCode)) {
                 deviceCode = TokenManager.getDeviceNo();
             }
-
-            if (mqttClientId == null || mqttClientId.isEmpty()) {
-                String appIdentifier = context.getPackageName();
-                mqttClientId = appIdentifier + "_" + deviceCode;
+            String appIdentifier = context.getPackageName();
+            if (TextUtils.isEmpty(mqttClientId)) {
+                if (TextUtils.isEmpty(deviceCode)) {
+                    mqttClientId = appIdentifier;
+                } else {
+                    mqttClientId = appIdentifier + "_" + deviceCode;
+                }
+            } else {
+                mqttClientId = mqttClientId.trim();
             }
-            if (appCode == null || appCode.isEmpty()) {
-                appCode = context.getPackageName();
+            if (TextUtils.isEmpty(appCode)) {
+                appCode = appIdentifier;
             }
             return new HLoggerConfig(this);
         }

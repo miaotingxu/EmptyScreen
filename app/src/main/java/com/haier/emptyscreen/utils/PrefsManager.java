@@ -117,8 +117,8 @@ public class PrefsManager {
     /**
      * 默认 URL（内网测试地址）
      */
-    private static final String DEFAULT_URL = "http://10.181.135.178:8088/#/?hospitalCode=5226";
-//    private static final String DEFAULT_URL = "https://www.baidu.com/";
+//    private static final String DEFAULT_URL = "http://192.168.250.103:8096/#/?hospitalCode=5226";
+    private static final String DEFAULT_URL = "https://www.baidu.com/";
 
     /**
      * 默认开机延迟（5 秒）
